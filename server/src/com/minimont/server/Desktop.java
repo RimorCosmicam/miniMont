@@ -77,8 +77,9 @@ public final class Desktop {
      * framework refuses to move it, open a second window of it here. Two windows is a worse answer
      * than one in the right place, and a better one than a desktop whose apps open behind you.
      */
-    public static boolean open(int displayId, String action) {
+    public static boolean open(int displayId, String action, String data) {
         String command = "am start -a " + action
+                + (data == null || data.isEmpty() ? "" : " -d " + data)
                 + " --display " + displayId
                 + " --windowingMode " + FREEFORM
                 + " -f 0x" + Integer.toHexString(NEW_TASK);

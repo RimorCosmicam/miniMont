@@ -387,7 +387,8 @@ class DesktopController private constructor(private val context: Context) {
     fun launch(component: String) = send("launch $component")
 
     /** Open one of the phone's own screens on the desktop, named by what it does. */
-    fun open(action: String) = send("open $action")
+    fun open(action: String, data: String? = null) =
+        send("open $action${if (data.isNullOrBlank()) "" else " $data"}")
 
     /** Close an app, and mean it: the host force-stops it. */
     fun close(packageName: String) = send("close $packageName")

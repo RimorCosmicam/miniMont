@@ -98,6 +98,7 @@ private object Phone {
     const val BATTERY = "android.intent.action.POWER_USAGE_SUMMARY"
     const val BATTERY_SAVER = "android.settings.BATTERY_SAVER_SETTINGS"
     const val NOTIFICATIONS = "android.settings.NOTIFICATION_SETTINGS"
+    const val APP_INFO = "android.settings.APPLICATION_DETAILS_SETTINGS"
 }
 
 /**
@@ -229,6 +230,11 @@ fun MontDesktop(
                     onFit = {
                         onFit(app.packageName)
                         panel = Panel.NONE
+                    },
+                    onInfo = {
+                        panel = Panel.NONE
+                        // Android's own page for the app, opened on the desktop like anything else.
+                        onOpenPhone("${Phone.APP_INFO} package:${app.packageName}")
                     },
                     onDismiss = { panel = Panel.NONE }
                 )
@@ -680,6 +686,7 @@ private fun ItemCard(
     onPin: () -> Unit,
     onClose: () -> Unit,
     onFit: () -> Unit,
+    onInfo: () -> Unit,
     onDismiss: () -> Unit
 ) {
     DesktopCard(width = 300, maxHeight = 220) {
@@ -689,6 +696,7 @@ private fun ItemCard(
             onPin()
             onDismiss()
         }
+        MontRow(label = "App info") { onInfo() }
         // The window that needs this most is the one whose corners are already off the screen, and
         // that is exactly the window you cannot drag back.
         MontRow(label = "Fit to the screen", enabled = open) { onFit() }
@@ -893,6 +901,7 @@ private fun DockItem(
     Box(
         Modifier
             .size(thickness.icon.dp * scale)
+            .secondary(onHold)
             .combinedClickable(onClick = onClick, onLongClick = onHold),
         contentAlignment = Alignment.Center
     ) {

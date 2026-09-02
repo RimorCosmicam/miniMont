@@ -127,6 +127,38 @@ public final class Tasks {
         return false;
     }
 
+    /**
+     * The packages with a window on one display, newest last.
+     *
+     * This is what "open" means on a desktop. Asking whether a process is alive answers a different
+     * question and answers it wrongly: Chrome's process outlives its window by design, so closing
+     * the window left it sitting in the taskbar with nothing on screen behind it.
+     */
+    public static java.util.List<String> onDisplay(int displayId, String exclude) {
+        java.util.LinkedHashSet<String> packages = new java.util.LinkedHashSet<>();
+        for (Object task : rootTasks()) {
+            Integer display = number(task, "displayId");
+            if (display == null || display != displayId) continue;
+            String name = packageOf(task);
+            if (name != null && !name.equals(exclude)) packages.add(name);
+        }
+        return new ArrayList<>(packages);
+    }
+
+    private static String packageOf(Object task) {
+        for (String name : new String[] { "topActivity", "baseActivity", "realActivity", "origActivity" }) {
+            Object value = field(task, name);
+            if (value instanceof ComponentName) return ((ComponentName) value).getPackageName();
+        }
+        Object children = field(task, "childTaskNames");
+        if (children instanceof String[] && ((String[]) children).length > 0) {
+            String child = ((String[]) children)[0];
+            int slash = child == null ? -1 : child.indexOf('/');
+            if (slash > 0) return child.substring(0, slash);
+        }
+        return null;
+    }
+
     /** Every root task the framework will tell us about, on any display. */
     private static List<Object> rootTasks() {
         try {

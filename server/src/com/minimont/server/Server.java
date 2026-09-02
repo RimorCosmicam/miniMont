@@ -26,6 +26,9 @@ import java.util.concurrent.Executors;
 public final class Server {
     private static final String NAME = "miniMont";
 
+    /** Our own backdrop holds a task on this display and is not an application anybody opened. */
+    private static final String OURS = "com.minimont";
+
     private final int dpi;
     private final boolean freeform;
     private final boolean preferHevc;
@@ -267,7 +270,11 @@ public final class Server {
                 break;
             }
             case "open": {
-                if (display != null && !argument.isEmpty()) Desktop.open(display.id(), argument);
+                if (display == null || argument.isEmpty()) return;
+                int gap = argument.indexOf(' ');
+                String action = gap < 0 ? argument : argument.substring(0, gap);
+                String data = gap < 0 ? null : argument.substring(gap + 1).trim();
+                Desktop.open(display.id(), action, data);
                 break;
             }
             case "area": {
@@ -342,22 +349,14 @@ public final class Server {
      * moment immediately after a launch or a close when the answer is the whole point.
      */
     private void announce(boolean force) {
-        java.util.Set<String> snapshot;
-        synchronized (launched) {
-            snapshot = new java.util.LinkedHashSet<>(launched);
-        }
-        java.util.Set<String> alive = Desktop.alive(snapshot);
-        // A launch takes a moment to become a process; until it does, the app we just started is
-        // still ours to show. Only a close removes something from the dock immediately.
-        java.util.Set<String> shown = new java.util.LinkedHashSet<>();
-        for (String name : snapshot) {
-            if (alive.contains(name) || force) shown.add(name);
-        }
+        if (display == null) return;
+        // What has a window here, which is what the taskbar is a list of. Asking the process list
+        // instead answered a different question: Chrome's process outlives its window, so closing
+        // the window left it in the taskbar with nothing on screen behind it.
+        java.util.LinkedHashSet<String> shown =
+                new java.util.LinkedHashSet<>(Tasks.onDisplay(display.id(), OURS));
         if (!force && shown.equals(reported)) return;
         reported = shown;
-        synchronized (launched) {
-            launched.retainAll(shown);
-        }
         Ln.i("EVENT", "running " + String.join(",", shown));
     }
 
