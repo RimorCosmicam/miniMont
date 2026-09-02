@@ -53,7 +53,6 @@ public final class Server {
             java.util.Collections.synchronizedSet(new java.util.LinkedHashSet<String>());
     /** The last set reported, so the app is told when it changes and not once a second regardless. */
     private java.util.Set<String> reported = new java.util.LinkedHashSet<>();
-    private java.util.List<String> reportedWindows = new java.util.ArrayList<>();
 
     private Transport transport;
     private Encoder encoder;
@@ -270,26 +269,6 @@ public final class Server {
                 announce(true);
                 break;
             }
-            case "arrange": {
-                String[] parts = argument.split(" ");
-                if (parts.length == 2) Desktop.arrange(Integer.parseInt(parts[0]), parts[1]);
-                announce(true);
-                break;
-            }
-            case "closetask": {
-                if (argument.isEmpty()) return;
-                int taskId = Integer.parseInt(argument);
-                // By task rather than by package: an app with two windows should lose the one whose
-                // frame you pressed, not both of them.
-                if (!Tasks.remove(taskId)) Ln.i("DESKTOP", "could not close task " + taskId);
-                announce(true);
-                break;
-            }
-            case "minimise": {
-                if (!argument.isEmpty()) Tasks.toBack(Integer.parseInt(argument));
-                announce(true);
-                break;
-            }
             case "open": {
                 if (display == null || argument.isEmpty()) return;
                 int gap = argument.indexOf(' ');
@@ -376,14 +355,9 @@ public final class Server {
         // the window left it in the taskbar with nothing on screen behind it.
         java.util.LinkedHashSet<String> shown =
                 new java.util.LinkedHashSet<>(Tasks.onDisplay(display.id(), OURS));
-        java.util.List<String> windows = Tasks.windows(display.id(), OURS);
-        boolean same = shown.equals(reported) && windows.equals(reportedWindows);
-        if (!force && same) return;
+        if (!force && shown.equals(reported)) return;
         reported = shown;
-        reportedWindows = windows;
         Ln.i("EVENT", "running " + String.join(",", shown));
-        // Where each window is, so the app can put chrome on it without asking.
-        Ln.i("EVENT", "windows " + String.join(";", windows));
     }
 
     private static String packageOf(String component) {

@@ -189,36 +189,6 @@ public final class Desktop {
         return Tasks.resize(taskId, left, top, left + width, top + height);
     }
 
-    /**
-     * Put a window where the arrangement menu says.
-     *
-     * The regions are the apps area cut in halves and quarters, so a filled window leaves the same
-     * gap above the taskbar that the taskbar leaves below itself — one measurement used twice,
-     * rather than two decisions that happen to sit near each other.
-     */
-    public static boolean arrange(int taskId, String where) {
-        int[] safe = area;
-        if (safe[2] <= safe[0] || safe[3] <= safe[1]) return false;
-        int left = safe[0], top = safe[1], right = safe[2], bottom = safe[3];
-        int midX = (left + right) / 2;
-        int midY = (top + bottom) / 2;
-
-        switch (where) {
-            case "fill": break;
-            case "left": right = midX; break;
-            case "right": left = midX; break;
-            case "top": bottom = midY; break;
-            case "bottom": top = midY; break;
-            case "tl": right = midX; bottom = midY; break;
-            case "tr": left = midX; bottom = midY; break;
-            case "bl": right = midX; top = midY; break;
-            case "br": left = midX; top = midY; break;
-            default: return false;
-        }
-        Ln.i("DESKTOP", "arranging " + taskId + " " + where);
-        return Tasks.resize(taskId, left, top, right, bottom);
-    }
-
     private static int clamp(int value, int low, int high) {
         return value < low ? low : (value > high ? high : value);
     }
