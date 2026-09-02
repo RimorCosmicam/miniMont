@@ -17,7 +17,16 @@ class HapticFeedbackManager(context: Context) {
         context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
     }
 
-    fun performHaptic(strength: HapticStrength) {
+    /**
+     * Feedback, and never anything more than that.
+     *
+     * Wrapped because a vibration is a courtesy and killing the app is not a proportionate answer to
+     * being refused one. This is exactly how it went wrong once already: the permission was missing
+     * from miniMont's manifest, and tapping the pill took the whole cover screen down with it.
+     */
+    fun performHaptic(strength: HapticStrength) = runCatching { vibrate(strength) }.let { }
+
+    private fun vibrate(strength: HapticStrength) {
         if (strength == HapticStrength.OFF || vibrator == null || !vibrator.hasVibrator()) return
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
