@@ -7,6 +7,9 @@ import android.provider.Settings
 import android.view.Display
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -69,6 +72,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        immersive()
         controller = DesktopController.of(this)
         controller.phoneDisplayId = display?.displayId ?: Display.DEFAULT_DISPLAY
         // Started with the app rather than with the desktop. It is what puts the dock on the
@@ -76,6 +80,32 @@ class MainActivity : ComponentActivity() {
         // outlives this window and may have been running before it opened.
         MontService.start(this)
         setContent { Root(controller) }
+    }
+
+    /**
+     * Take the whole screen, and keep it.
+     *
+     * The cover display is three inches across and the navigation bar eats a strip of it that
+     * happens to be exactly where the keyboard's bottom row and the touchpad's click corner are.
+     * There is nothing on this screen the system bars are needed for — the pill is the only way in
+     * and out of anything.
+     *
+     * Hidden with the transient behaviour so a swipe from the edge still brings them back for as
+     * long as they are wanted, and re-hidden on focus because Android puts them back whenever
+     * anything else has been in front.
+     */
+    private fun immersive() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            hide(WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) immersive()
     }
 
     override fun onDestroy() {
