@@ -46,6 +46,7 @@ import com.minimont.ui.mont.MontCard
 import com.minimont.ui.mont.MontLabel
 import com.minimont.ui.mont.MontRow
 import com.minimont.ui.mont.MontSurface
+import com.minimont.ui.mont.MontToggle
 import com.minimont.ui.mont.MontWhite
 import java.text.SimpleDateFormat
 import java.time.LocalDate
@@ -65,7 +66,7 @@ private const val ICON = 30
 private const val PAD = 14
 
 /** What the chrome can have open above the dock. At most one, because two is a window manager. */
-private enum class Panel { NONE, APPS, SETTINGS, ITEM, CALENDAR, NOTIFICATIONS }
+private enum class Panel { NONE, APPS, SETTINGS, ITEM, CALENDAR, NOTIFICATIONS, QUICK }
 
 /**
  * Everything miniMont draws above the windows: the dock, the status card, and whatever card is
@@ -83,7 +84,9 @@ fun MontDesktop(
     onLaunch: (String) -> Unit,
     onClose: (String) -> Unit,
     onPickImage: () -> Unit,
-    onGrantNotifications: () -> Unit
+    onGrantNotifications: () -> Unit,
+    onWifi: (Boolean) -> Unit,
+    onBatterySaver: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
     val store by DesktopStore.state.collectAsState()
@@ -143,6 +146,18 @@ fun MontDesktop(
                 )
             }
 
+            Panel.QUICK -> QuickCard(
+                running = running,
+                onWifi = onWifi,
+                onBatterySaver = onBatterySaver,
+                onCloseAll = {
+                    running.forEach(onClose)
+                    panel = Panel.NONE
+                },
+                onSettings = { panel = Panel.SETTINGS },
+                onClose = { panel = Panel.NONE }
+            )
+
             Panel.CALENDAR -> CalendarCard { panel = Panel.NONE }
 
             Panel.NOTIFICATIONS -> NotificationsCard { panel = Panel.NONE }
@@ -171,6 +186,7 @@ fun MontDesktop(
             Spacer(Modifier.width(14.dp * LocalMontScale.current))
             StatusCard(
                 onClock = { panel = if (panel == Panel.CALENDAR) Panel.NONE else Panel.CALENDAR },
+                onBattery = { panel = if (panel == Panel.QUICK) Panel.NONE else Panel.QUICK },
                 onNotifications = {
                     panel = if (panel == Panel.NOTIFICATIONS) Panel.NONE else Panel.NOTIFICATIONS
                 }
@@ -384,18 +400,22 @@ private fun DockItem(
 }
 
 /**
- * The clock block.
+ * The clock block: four facts in a two by two grid.
  *
- * Three facts and two of them can be pressed. A separate card from the dock, with air between them,
- * because a dock is a place you aim at and this is a place you read — and one rectangle holding
- * both makes you aim at the thing you read.
+ * Hours and minutes on the top row, and under each of them the number that belongs there — the
+ * battery under the hours, what is waiting under the minutes. It reads as a grid rather than as a
+ * clock with a caption, which is what it is: four separate things, three of which you glance at and
+ * one of which you read.
  *
- * The battery is green rather than white because it is the one number here that is *about* the
- * phone rather than about the time, and it turns red under twenty, which is the only place in
- * miniMont that red appears.
+ * The battery is green because it is the one number here that is about the phone rather than about
+ * the time, and red under twenty, which is the only place red appears in miniMont.
  */
 @Composable
-private fun StatusCard(onClock: () -> Unit, onNotifications: () -> Unit) {
+private fun StatusCard(
+    onClock: () -> Unit,
+    onBattery: () -> Unit,
+    onNotifications: () -> Unit
+) {
     val context = LocalContext.current
     val scale = LocalMontScale.current
     var now by remember { mutableStateOf(Date()) }
@@ -410,7 +430,8 @@ private fun StatusCard(onClock: () -> Unit, onNotifications: () -> Unit) {
         }
     }
 
-    val time = remember(now) { SimpleDateFormat("HH:mm", Locale.getDefault()).format(now) }
+    val hours = remember(now) { SimpleDateFormat("HH", Locale.getDefault()).format(now) }
+    val minutes = remember(now) { SimpleDateFormat("mm", Locale.getDefault()).format(now) }
 
     Column(
         Modifier
@@ -418,50 +439,133 @@ private fun StatusCard(onClock: () -> Unit, onNotifications: () -> Unit) {
             // As tall as the dock and as wide as it is tall, so the two stand together rather than
             // each following a rule of its own.
             .size((PAD * 2 + ICON).dp * scale)
-            .padding(horizontal = 6.dp * scale, vertical = 5.dp * scale),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(horizontal = 5.dp * scale, vertical = 5.dp * scale),
+        verticalArrangement = Arrangement.Center
     ) {
-        MontLabel(
-            time,
-            Modifier.combinedClickable(onClick = onClock),
-            size = 17,
-            alpha = MontWhite.PRIMARY
-        )
-        Spacer(Modifier.height(3.dp * scale))
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            MontLabel(
-                "$battery%",
-                size = 9,
-                colour = if (battery in 1..19) MontAccent.LowBattery else MontAccent.Live,
-                alpha = 1f
-            )
-            // Nothing announces itself: at zero the count is not drawn small or grey, it is not
-            // drawn, and the block it lives in goes with it.
-            if (notes.isNotEmpty()) {
-                Box(
-                    Modifier
-                        .background(Color.White)
-                        .combinedClickable(onClick = onNotifications)
-                        .padding(horizontal = 3.dp * scale, vertical = 1.dp * scale)
-                ) {
-                    Text(
-                        "${notes.size}",
-                        color = Color.Black,
-                        fontFamily = Mont,
-                        fontWeight = FontWeight.Black,
-                        fontSize = (9 * scale).sp,
-                        maxLines = 1
-                    )
+        Row(Modifier.fillMaxWidth()) {
+            Cell(Modifier.weight(1f).combinedClickable(onClick = onClock)) {
+                MontLabel(hours, size = 16, alpha = MontWhite.PRIMARY)
+            }
+            Cell(Modifier.weight(1f).combinedClickable(onClick = onClock)) {
+                MontLabel(minutes, size = 16, alpha = MontWhite.PRIMARY)
+            }
+        }
+        Spacer(Modifier.height(2.dp * scale))
+        Row(Modifier.fillMaxWidth()) {
+            Cell(Modifier.weight(1f).combinedClickable(onClick = onBattery)) {
+                MontLabel(
+                    "$battery",
+                    size = 10,
+                    colour = if (battery in 1..19) MontAccent.LowBattery else MontAccent.Live,
+                    alpha = 1f
+                )
+            }
+            Cell(Modifier.weight(1f).combinedClickable(onClick = onNotifications)) {
+                // Nothing announces itself: at zero the count is not drawn faintly, and the block
+                // it lives in is not drawn either. The cell is simply empty.
+                if (notes.isNotEmpty()) {
+                    Box(
+                        Modifier
+                            .background(Color.White)
+                            .padding(horizontal = 3.dp * scale, vertical = 1.dp * scale)
+                    ) {
+                        Text(
+                            "${notes.size}",
+                            color = Color.Black,
+                            fontFamily = Mont,
+                            fontWeight = FontWeight.Black,
+                            fontSize = (9 * scale).sp,
+                            maxLines = 1
+                        )
+                    }
                 }
             }
         }
     }
 }
+
+/** One square of the grid. Equal width, centred, so four different things line up as four. */
+@Composable
+private fun Cell(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Box(modifier, contentAlignment = Alignment.Center) { content() }
+}
+
+/**
+ * Quick toggles, behind the battery.
+ *
+ * Two switches, one action and a way through to everything else. The switches are the two things
+ * that change what the phone is doing while it is being a desktop — the radio it is streaming over,
+ * and the mode that will throttle it — and both are read from the phone rather than remembered, so
+ * the card is right even when something else changed them.
+ *
+ * The toggle says what the control currently is, never what pressing it would do.
+ */
+@Composable
+private fun QuickCard(
+    running: List<String>,
+    onWifi: (Boolean) -> Unit,
+    onBatterySaver: (Boolean) -> Unit,
+    onCloseAll: () -> Unit,
+    onSettings: () -> Unit,
+    onClose: () -> Unit
+) {
+    val context = LocalContext.current
+    val scale = LocalMontScale.current
+    var reads by remember { mutableStateOf(0) }
+    var wifi by remember { mutableStateOf(false) }
+    var saver by remember { mutableStateOf(false) }
+
+    // Read on open, and again a moment after anything is pressed: the host flips these through the
+    // shell and the system takes its time agreeing, so an answer read immediately is the old one.
+    LaunchedEffect(reads) {
+        repeat(4) {
+            wifi = wifiOn(context)
+            saver = saverOn(context)
+            kotlinx.coroutines.delay(600)
+        }
+    }
+
+    DesktopCard(width = 320, maxHeight = 320) {
+        MontLabel("QUICK", size = 16, alpha = MontWhite.PRIMARY)
+        Spacer(Modifier.height(10.dp * scale))
+
+        ToggleRow("Wi-Fi", wifi) {
+            wifi = it
+            onWifi(it)
+            reads++
+        }
+        ToggleRow("Battery saver", saver) {
+            saver = it
+            onBatterySaver(it)
+            reads++
+        }
+
+        Spacer(Modifier.height(12.dp * scale))
+        MontRow(label = "Close all windows", enabled = running.isNotEmpty()) { onCloseAll() }
+        MontRow(label = "miniMont settings", active = false) { onSettings() }
+        Spacer(Modifier.height(10.dp * scale))
+        MontRow(label = "Close", active = false) { onClose() }
+    }
+}
+
+@Composable
+private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 7.dp * LocalMontScale.current),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        MontLabel(label.uppercase(), Modifier.weight(1f), alpha = MontWhite.ACTIVE)
+        MontToggle(checked, onChange)
+    }
+}
+
+private fun wifiOn(context: Context): Boolean = runCatching {
+    (context.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager).isWifiEnabled
+}.getOrDefault(false)
+
+private fun saverOn(context: Context): Boolean = runCatching {
+    (context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager).isPowerSaveMode
+}.getOrDefault(false)
 
 /**
  * The calendar, behind the clock.

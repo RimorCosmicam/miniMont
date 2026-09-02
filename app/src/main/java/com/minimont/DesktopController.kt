@@ -389,6 +389,11 @@ class DesktopController private constructor(private val context: Context) {
     /** Close an app, and mean it: the host force-stops it. */
     fun close(packageName: String) = send("close $packageName")
 
+    /** The two system switches the quick card offers. Flipped by the host, which is allowed to. */
+    fun wifi(on: Boolean) = send("wifi ${if (on) 1 else 0}")
+
+    fun batterySaver(on: Boolean) = send("saver ${if (on) 1 else 0}")
+
     /** Put the backdrop back in front, after something has covered it. */
     fun showBackdrop() = send("backdrop")
 

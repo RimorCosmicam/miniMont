@@ -266,6 +266,14 @@ public final class Server {
                 announce(true);
                 break;
             }
+            case "wifi": {
+                Desktop.wifi("1".equals(argument));
+                break;
+            }
+            case "saver": {
+                Desktop.batterySaver("1".equals(argument));
+                break;
+            }
             case "backdrop": {
                 if (display != null && !backdrop.isEmpty()) Desktop.backdrop(display.id(), backdrop);
                 break;

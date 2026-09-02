@@ -171,6 +171,24 @@ public final class Desktop {
         return found;
     }
 
+    /**
+     * The system switches the desktop is allowed to flip.
+     *
+     * Named verbs rather than a general shell escape. The app already holds a shell — it started
+     * this process — so a `run whatever` command would add no capability, only an unauditable one.
+     * These are the two things the desktop actually has a reason to change, and adding a third
+     * means adding a line here where it can be seen.
+     */
+    public static void wifi(boolean on) {
+        run("svc wifi " + (on ? "enable" : "disable"));
+        Ln.i("DESKTOP", "wifi " + (on ? "on" : "off"));
+    }
+
+    public static void batterySaver(boolean on) {
+        run("settings put global low_power " + (on ? 1 : 0));
+        Ln.i("DESKTOP", "battery saver " + (on ? "on" : "off"));
+    }
+
     private static String run(String command) {
         StringBuilder output = new StringBuilder();
         try {
