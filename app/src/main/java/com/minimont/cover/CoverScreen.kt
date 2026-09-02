@@ -195,15 +195,25 @@ fun CoverScreen(controller: DesktopController, onStop: () -> Unit) {
             }
 
             // The pill sits at the lower left of the cover display: clear of the camera, and under
-            // the thumb. Tap to change what the screen is; hold to reach the tablet's own page.
+            // the thumb. It is the only way in and out of everything else, so it carries all three
+            // surfaces rather than two and a secret: a mode you can only reach by holding is a mode
+            // that does not exist. Tap goes round; double tap comes straight back to the pointer,
+            // which is where you are ninety percent of the time.
             MontPill(
                 isAmoled = preferences.amoledMode,
                 isConnected = controller.state.collectAsState().value.running,
                 onTap = {
-                    surface = if (surface == Surface.PAD) Surface.KEYS else Surface.PAD
+                    surface = when (surface) {
+                        Surface.PAD -> Surface.KEYS
+                        Surface.KEYS -> Surface.AIRMATE
+                        Surface.AIRMATE -> Surface.PAD
+                    }
                     haptic()
                 },
-                onDoubleTap = { surface = Surface.PAD },
+                onDoubleTap = {
+                    surface = Surface.PAD
+                    haptic()
+                },
                 onLongPress = {
                     surface = Surface.AIRMATE
                     haptic()
@@ -298,9 +308,10 @@ private fun AirMatePage(controller: DesktopController, onStop: () -> Unit) {
         Spacer(Modifier.height(4.dp))
         MontDetail(
             when {
-                state.running && state.size != null ->
-                    "Sending ${state.size?.first} × ${state.size?.second}."
-                state.running -> "Running."
+                state.client != null && state.size != null ->
+                    "Sending ${state.size?.first} × ${state.size?.second} to ${state.client}."
+                state.running -> "Running. Open AirMate on the tablet and it will find this."
+                state.busy -> "Starting…"
                 else -> state.message.ifBlank { "Not sending." }
             }
         )
