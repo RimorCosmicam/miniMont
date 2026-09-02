@@ -3,33 +3,44 @@ package com.minimont.desktop
 import android.app.Notification
 import android.content.ComponentName
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.drawable.Icon
+import android.os.Build
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/** One notification, reduced to what a desktop can show and act on. */
+/** Something the notification offered to do about itself. */
+data class NoteAction(val title: String, val index: Int)
+
+/** One notification, with enough of it to be worth showing rather than counting. */
 data class Note(
     val key: String,
+    val packageName: String,
     val app: String,
     val title: String,
     val text: String,
-    val openable: Boolean
+    val openable: Boolean,
+    /** The app's own accent, already darkened far enough to read white type on. */
+    val colour: Int,
+    val picture: ImageBitmap?,
+    val actions: List<NoteAction>
 )
 
 /**
- * What is standing, and the two things that can be done to it.
+ * What is standing, and everything that can be done to it.
  *
- * miniMont does not show notifications on the desktop and does not keep them. It holds the list
- * while it is on screen so that the count on the status card is true and the card behind it can
- * open one or throw it away. Nothing is stored, nothing is read that is not shown.
+ * miniMont holds the list while it is on screen — the count on the taskbar has to be true, and the
+ * centre behind it has to show what the notification actually says rather than that there is one.
+ * Nothing is stored and nothing is read that is not shown.
  */
 object Notifications {
     private val _notes = MutableStateFlow<List<Note>>(emptyList())
     val notes = _notes.asStateFlow()
-
-    val count get() = _notes
 
     @Volatile
     internal var service: MontNotificationListener? = null
@@ -43,7 +54,11 @@ object Notifications {
         service?.open(key)
     }
 
-    /** Throw it away, on the phone as well as here — there is only one of it. */
+    /** Do one of the things the notification offered — reply, mark read, whatever it named. */
+    fun act(key: String, index: Int) {
+        service?.act(key, index)
+    }
+
     fun dismiss(key: String) {
         runCatching { service?.cancelNotification(key) }
     }
@@ -53,7 +68,6 @@ object Notifications {
         runCatching { service?.cancelAllNotifications() }
     }
 
-    /** Whether Android has been told this app may see them. Without it the list stays empty. */
     fun granted(context: Context): Boolean {
         val enabled = Settings.Secure.getString(
             context.contentResolver, "enabled_notification_listeners"
@@ -80,16 +94,29 @@ class MontNotificationListener : NotificationListenerService() {
     override fun onNotificationRemoved(notification: StatusBarNotification?) = refresh()
 
     fun open(key: String) {
-        val found = runCatching {
-            activeNotifications?.firstOrNull { it.key == key }
-        }.getOrNull() ?: return
+        val found = find(key) ?: return
         runCatching { found.notification.contentIntent?.send() }
-        // Tapping a notification in the shade dismisses it when the app said it should, and a
-        // desktop that leaves it standing after opening it is a desktop with a count that lies.
         if (found.notification.flags and Notification.FLAG_AUTO_CANCEL != 0) {
             runCatching { cancelNotification(key) }
         }
     }
+
+    /**
+     * Fire one of the notification's own actions.
+     *
+     * An action that wants text typed into it carries a RemoteInput, and sending it bare does what
+     * tapping it on the phone does when you have not typed anything — it opens the place you type.
+     * miniMont does not put a text field in the card for it, because a reply box that silently
+     * sends nothing would be worse than not offering one.
+     */
+    fun act(key: String, index: Int) {
+        val found = find(key) ?: return
+        val action = found.notification.actions?.getOrNull(index) ?: return
+        runCatching { action.actionIntent?.send() }
+    }
+
+    private fun find(key: String): StatusBarNotification? =
+        runCatching { activeNotifications?.firstOrNull { it.key == key } }.getOrNull()
 
     private fun refresh() {
         val notes = runCatching {
@@ -98,22 +125,86 @@ class MontNotificationListener : NotificationListenerService() {
                 // happening — a download, a call, a player. Counting them makes the number never
                 // reach zero, which makes it worth nothing.
                 .filter { it.notification.flags and Notification.FLAG_ONGOING_EVENT == 0 }
-                .map { standing ->
-                    val extras = standing.notification.extras
-                    Note(
-                        key = standing.key,
-                        app = label(standing.packageName),
-                        title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty(),
-                        text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty(),
-                        openable = standing.notification.contentIntent != null
-                    )
-                }
+                .map { standing -> read(standing) }
         }.getOrDefault(emptyList())
         Notifications.set(notes)
     }
+
+    private fun read(standing: StatusBarNotification): Note {
+        val notification = standing.notification
+        val extras = notification.extras
+        val text = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
+            ?: extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
+            ?: ""
+        return Note(
+            key = standing.key,
+            packageName = standing.packageName,
+            app = label(standing.packageName),
+            title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty(),
+            text = text,
+            openable = notification.contentIntent != null,
+            colour = readable(notification.color),
+            picture = picture(standing),
+            actions = notification.actions.orEmpty().mapIndexedNotNull { index, action ->
+                action.title?.toString()?.takeIf { it.isNotBlank() }?.let { NoteAction(it, index) }
+            }
+        )
+    }
+
+    /**
+     * The app's accent, dark enough to read white Mont Black on.
+     *
+     * Apps choose their accent to sit behind their own dark type, or choose nothing at all. A title
+     * bar is white type, so a bright yellow brand colour has to come down until it can carry one —
+     * scaled rather than blended, so it stays recognisably the app's colour rather than becoming
+     * grey with a memory of it.
+     */
+    private fun readable(colour: Int): Int {
+        if (colour == 0) return DEFAULT_COLOUR
+        var red = (colour shr 16) and 0xFF
+        var green = (colour shr 8) and 0xFF
+        var blue = colour and 0xFF
+        var luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255.0
+        var guard = 0
+        while (luminance > 0.42 && guard++ < 8) {
+            red = (red * 0.82).toInt()
+            green = (green * 0.82).toInt()
+            blue = (blue * 0.82).toInt()
+            luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255.0
+        }
+        return (0xFF shl 24) or (red shl 16) or (green shl 8) or blue
+    }
+
+    /** The picture a notification carries, if it carries one worth the room. */
+    private fun picture(standing: StatusBarNotification): ImageBitmap? = runCatching {
+        val extras = standing.notification.extras
+        val bitmap = if (Build.VERSION.SDK_INT >= 33) {
+            extras.getParcelable(Notification.EXTRA_PICTURE, Bitmap::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            extras.getParcelable(Notification.EXTRA_PICTURE) as? Bitmap
+        }
+        bitmap?.asImageBitmap() ?: largeIcon(standing)
+    }.getOrNull()
+
+    private fun largeIcon(standing: StatusBarNotification): ImageBitmap? = runCatching {
+        val icon: Icon = standing.notification.getLargeIcon() ?: return null
+        val drawable = icon.loadDrawable(this) ?: return null
+        val width = drawable.intrinsicWidth.coerceIn(1, 256)
+        val height = drawable.intrinsicHeight.coerceIn(1, 256)
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        drawable.setBounds(0, 0, width, height)
+        drawable.draw(android.graphics.Canvas(bitmap))
+        bitmap.asImageBitmap()
+    }.getOrNull()
 
     private fun label(packageName: String): String = runCatching {
         val info = packageManager.getApplicationInfo(packageName, 0)
         packageManager.getApplicationLabel(info).toString()
     }.getOrDefault(packageName)
+
+    private companion object {
+        /** For the apps that name no colour at all. Mont's surface, so they read as unbranded. */
+        const val DEFAULT_COLOUR = 0xFF1A1A1A.toInt()
+    }
 }

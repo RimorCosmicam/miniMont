@@ -49,6 +49,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import com.minimont.ui.mont.LocalMontScale
 import com.minimont.ui.mont.Mont
@@ -173,10 +174,15 @@ fun MontDesktop(
         (store.pinned + running.filterNot { it in store.pinned }).mapNotNull { byPackage[it] }
     }
 
-    Column(
-        Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    Column(Modifier.fillMaxWidth()) {
+
+        // The notification centre lives down the right, where a shade has always been. Everything
+        // else opens in the middle, above the thing that opened it.
+        Box(
+            Modifier.fillMaxWidth(),
+            contentAlignment =
+                if (panel == Panel.NOTIFICATIONS) Alignment.CenterEnd else Alignment.Center
+        ) {
 
         when (panel) {
             Panel.APPS -> StartMenu(
@@ -291,6 +297,7 @@ fun MontDesktop(
             Panel.NOTIFICATIONS -> NotificationsCard { panel = Panel.NONE }
 
             Panel.NONE -> Unit
+        }
         }
 
         Spacer(Modifier.height(store.thickness.gap.dp * LocalMontScale.current))
@@ -1250,58 +1257,130 @@ private fun CalendarCard(onClose: () -> Unit) {
     }
 }
 
-/** What is standing, and the two things that can be done to it. */
+/**
+ * The notification centre, down the right of the screen.
+ *
+ * Grouped by application, because that is how they arrive and how you deal with them — six from one
+ * chat is one conversation, not six problems.
+ *
+ * Each one is a bar in the app's own colour with its title in white Mont Black and an X at the far
+ * end, and touching the underside of that bar, a white box with what the notification actually
+ * says. The inversion is deliberate: everywhere else in miniMont white type sits on black, and here
+ * the content is the one thing that came from somewhere else, so it is given the opposite ground
+ * and reads as quoted rather than as ours.
+ */
 @Composable
 private fun NotificationsCard(onClose: () -> Unit) {
     val scale = LocalMontScale.current
+    val configuration = LocalConfiguration.current
     val notes by Notifications.notes.collectAsState()
+    val grouped = remember(notes) { notes.groupBy { it.packageName } }
 
-    DesktopCard(width = 380, maxHeight = 420) {
+    DesktopCard(width = 380, maxHeight = (configuration.screenHeightDp * 0.78f).toInt()) {
         MontLabel("NOTIFICATIONS", size = 16, alpha = MontWhite.PRIMARY)
         Spacer(Modifier.height(10.dp * scale))
 
-        if (notes.isEmpty()) {
-            Light("Nothing standing.", alpha = MontWhite.DETAIL, size = 12)
+        if (notes.isEmpty()) MontDetail("Nothing standing.")
+
+        grouped.forEach { (_, group) ->
+            // The app is named once, over its own run, rather than on every card belonging to it.
+            MontLabel(group.first().app.uppercase(), size = 11, alpha = MontWhite.DETAIL)
+            Spacer(Modifier.height(4.dp * scale))
+            group.forEach { note ->
+                NoteCard(note)
+                Spacer(Modifier.height(9.dp * scale))
+            }
+            Spacer(Modifier.height(4.dp * scale))
         }
 
-        notes.forEach { note ->
-            Row(
-                Modifier.fillMaxWidth().padding(vertical = 6.dp * scale),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f)) {
-                    MontLabel(
-                        note.title.ifBlank { note.app }.uppercase(),
-                        alpha = MontWhite.PRIMARY,
-                        size = 13
-                    )
-                    if (note.text.isNotBlank()) {
-                        Light(note.text, alpha = MontWhite.DETAIL, size = 11)
-                    }
-                }
-                // Two letters rather than two icons, because Mont says a thing with a word when a
-                // word will do, and these are the shortest words there are.
-                MontLabel(
-                    "O",
-                    Modifier
-                        .combinedClickable(enabled = note.openable) { Notifications.open(note.key) }
-                        .padding(horizontal = 8.dp * scale),
-                    alpha = if (note.openable) MontWhite.ACTIVE else MontWhite.DISABLED,
-                    size = 15
-                )
-                MontLabel(
-                    "X",
-                    Modifier
-                        .combinedClickable { Notifications.dismiss(note.key) }
-                        .padding(start = 4.dp * scale),
-                    alpha = MontWhite.ACTIVE,
-                    size = 15
+        Spacer(Modifier.height(6.dp * scale))
+        if (notes.isNotEmpty()) MontRow(label = "Clear all") { Notifications.dismissAll() }
+        MontRow(label = "Close", active = false) { onClose() }
+    }
+}
+
+/** One notification: its own bar, and the white box under it holding what it said. */
+@Composable
+private fun NoteCard(note: Note) {
+    val scale = LocalMontScale.current
+
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .background(Color(note.colour))
+                .combinedClickable(enabled = note.openable) { Notifications.open(note.key) }
+                .padding(horizontal = 8.dp * scale, vertical = 5.dp * scale),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            MontLabel(
+                note.title.ifBlank { note.app }.uppercase(),
+                Modifier.weight(1f),
+                size = 13,
+                alpha = MontWhite.ACTIVE
+            )
+            MontLabel(
+                "X",
+                Modifier
+                    .combinedClickable { Notifications.dismiss(note.key) }
+                    .padding(start = 8.dp * scale),
+                size = 13,
+                alpha = MontWhite.ACTIVE
+            )
+        }
+
+        // Touching the bar above it. No gap, no rounding, no shadow — one object in two halves.
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .background(Color.White)
+                .padding(horizontal = 8.dp * scale, vertical = 7.dp * scale)
+        ) {
+            if (note.text.isNotBlank()) {
+                Text(
+                    note.text,
+                    color = Color.Black,
+                    fontFamily = Mont,
+                    fontWeight = FontWeight.Normal,
+                    fontSize = (12 * scale).sp,
+                    lineHeight = (16 * scale).sp
                 )
             }
-        }
 
-        Spacer(Modifier.height(10.dp * scale))
-        MontRow(label = "Close", active = false) { onClose() }
+            note.picture?.let { picture ->
+                if (note.text.isNotBlank()) Spacer(Modifier.height(6.dp * scale))
+                Image(
+                    picture,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxWidth(),
+                    contentScale = ContentScale.FillWidth
+                )
+            }
+
+            // Whatever the notification itself offered, at the bottom right of its own box, in the
+            // black that everything on this ground is written in.
+            if (note.actions.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp * scale))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp * scale, Alignment.End)
+                ) {
+                    note.actions.forEach { action ->
+                        Text(
+                            action.title.uppercase(),
+                            modifier = Modifier.combinedClickable {
+                                Notifications.act(note.key, action.index)
+                            },
+                            color = Color.Black,
+                            fontFamily = Mont,
+                            fontWeight = FontWeight.Black,
+                            fontSize = (11 * scale).sp,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
