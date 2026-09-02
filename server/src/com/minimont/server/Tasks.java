@@ -145,6 +145,71 @@ public final class Tasks {
         return new ArrayList<>(packages);
     }
 
+    /**
+     * Every window on a display, as `taskId|package|left,top,right,bottom`.
+     *
+     * The chrome is drawn from this. It is read on a tick rather than pushed, because the callback
+     * that would push it — a task stack listener — is one more hidden interface to bind, and a
+     * second of staleness on a window nobody is dragging costs nothing. A window somebody *is*
+     * dragging is being moved by us, so we already know where it is.
+     */
+    public static java.util.List<String> windows(int displayId, String exclude) {
+        java.util.List<String> out = new ArrayList<>();
+        for (Object task : rootTasks()) {
+            Integer display = number(task, "displayId");
+            Integer id = number(task, "taskId");
+            if (display == null || id == null || display != displayId) continue;
+            String name = packageOf(task);
+            if (name == null || name.equals(exclude)) continue;
+            Boolean visible = bool(task, "isVisible");
+            if (visible != null && !visible) continue;
+            int[] bounds = bounds(task);
+            if (bounds[2] <= bounds[0] || bounds[3] <= bounds[1]) continue;
+            out.add(id + "|" + name + "|" + bounds[0] + "," + bounds[1]
+                    + "," + bounds[2] + "," + bounds[3]);
+        }
+        return out;
+    }
+
+    /** Put a task at the bottom of its display, which is what minimising one means here. */
+    public static boolean toBack(int taskId) {
+        for (String name : new String[] { "moveRootTaskToBack", "moveTaskToBack" }) {
+            try {
+                Object service = service();
+                Method method = Class.forName("android.app.IActivityTaskManager")
+                        .getMethod(name, int.class);
+                method.invoke(service, taskId);
+                Ln.i("TASKS", name + "(" + taskId + ")");
+                return true;
+            } catch (Throwable notThisOne) {
+                // Try the next name; they have not been the same across releases.
+            }
+        }
+        boolean moved = run("am stack move-task " + taskId + " " + taskId + " false");
+        if (!moved) Ln.i("TASKS", "nothing would send task " + taskId + " to the back");
+        return moved;
+    }
+
+    /** Close one window, rather than every window an application happens to have. */
+    public static boolean remove(int taskId) {
+        try {
+            Object service = service();
+            Method method = Class.forName("android.app.IActivityTaskManager")
+                    .getMethod("removeTask", int.class);
+            Object result = method.invoke(service, taskId);
+            Ln.i("TASKS", "removeTask(" + taskId + ") = " + result);
+            return !(result instanceof Boolean) || (Boolean) result;
+        } catch (Throwable refused) {
+            Ln.i("TASKS", "framework would not remove task " + taskId + ": " + refused);
+        }
+        return run("am stack remove " + taskId);
+    }
+
+    private static Boolean bool(Object instance, String name) {
+        Object value = field(instance, name);
+        return value instanceof Boolean ? (Boolean) value : null;
+    }
+
     private static String packageOf(Object task) {
         for (String name : new String[] { "topActivity", "baseActivity", "realActivity", "origActivity" }) {
             Object value = field(task, name);

@@ -12,6 +12,9 @@ import com.minimont.desktop.AppCatalog
 import com.minimont.desktop.CursorLayer
 import com.minimont.desktop.DesktopChrome
 import com.minimont.desktop.DesktopStore
+import com.minimont.desktop.WindowChrome
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import com.minimont.desktop.WallpaperPickerActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +39,8 @@ class MontService : Service() {
     private lateinit var controller: DesktopController
     private var chrome: DesktopChrome? = null
     private var cursor: CursorLayer? = null
+    private var chromeWindows: WindowChrome? = null
+    private var follow: kotlinx.coroutines.Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -73,6 +78,10 @@ class MontService : Service() {
         val display = displays.displays.firstOrNull { it.name == DISPLAY_NAME }
         if (display?.displayId == attachedTo) return
 
+        follow?.cancel()
+        follow = null
+        chromeWindows?.clear()
+        chromeWindows = null
         cursor?.let { runCatching { it.dismiss() } }
         cursor = null
         chrome?.let { runCatching { it.dismiss() } }
@@ -90,6 +99,22 @@ class MontService : Service() {
         // is a cursor you cannot use to press the thing it is pointing at.
         cursor = CursorLayer(this, display, controller)
             .also { runCatching { it.show() } }
+
+        // Chrome for every window, following what the host reports. The frames go up after the
+        // cursor so the cursor stays on top of them; a pointer that slides under a window's own
+        // title bar is a pointer you cannot use on it.
+        val windows = WindowChrome(this, display, controller)
+        chromeWindows = windows
+        follow = scope.launch {
+            controller.state
+                .map { it.windows }
+                .distinctUntilChanged()
+                .collect { open ->
+                    windows.show(open) { packageName ->
+                        AppCatalog.byPackage(this@MontService, packageName)?.label ?: packageName
+                    }
+                }
+        }
     }
 
     /**
@@ -117,6 +142,8 @@ class MontService : Service() {
 
     override fun onDestroy() {
         runCatching { displays.unregisterDisplayListener(listener) }
+        follow?.cancel()
+        chromeWindows?.clear()
         cursor?.dismiss()
         cursor = null
         chrome?.dismiss()

@@ -41,6 +41,16 @@ private val LADDER = listOf(
     1024 to 768
 )
 
+/** One window on the miniMont display, as the host last reported it. */
+data class DesktopWindow(
+    val taskId: Int,
+    val packageName: String,
+    val left: Int,
+    val top: Int,
+    val right: Int,
+    val bottom: Int
+)
+
 enum class DesktopStage {
     IDLE,
     PAIRING,
@@ -72,7 +82,9 @@ data class DesktopState(
      * Not `running`: that word is already taken here by whether the desktop itself is up, and the
      * two are different questions with the same answer often enough to be worth keeping apart.
      */
-    val openApps: List<String> = emptyList()
+    val openApps: List<String> = emptyList(),
+    /** Every window on the desktop, with where it is, so chrome can be drawn on it. */
+    val windows: List<DesktopWindow> = emptyList()
 ) {
     /** The sizes worth offering: the ordinary ones, minus anything past the client's decoder. */
     val choices: List<Pair<Int, Int>>
@@ -289,6 +301,25 @@ class DesktopController private constructor(private val context: Context) {
                             )
                         }
 
+                        line.startsWith("[EVENT] windows") -> {
+                            val windows = line.substringAfter("windows").trim()
+                                .split(';')
+                                .mapNotNull { entry ->
+                                    val parts = entry.split('|')
+                                    val bounds = parts.getOrNull(2)?.split(',')
+                                    if (parts.size < 3 || bounds?.size != 4) return@mapNotNull null
+                                    DesktopWindow(
+                                        taskId = parts[0].toIntOrNull() ?: return@mapNotNull null,
+                                        packageName = parts[1],
+                                        left = bounds[0].toIntOrNull() ?: return@mapNotNull null,
+                                        top = bounds[1].toIntOrNull() ?: return@mapNotNull null,
+                                        right = bounds[2].toIntOrNull() ?: return@mapNotNull null,
+                                        bottom = bounds[3].toIntOrNull() ?: return@mapNotNull null
+                                    )
+                                }
+                            _state.update { it.copy(windows = windows) }
+                        }
+
                         line.startsWith("[EVENT] running") -> {
                             val packages = line.substringAfter("running").trim()
                                 .split(',').filter { it.isNotBlank() }
@@ -402,6 +433,15 @@ class DesktopController private constructor(private val context: Context) {
     fun setArea(left: Int, top: Int, right: Int, bottom: Int) =
         send("area $left $top $right $bottom")
 
+    /** Put a window in one of the arrangement's regions: fill, halves, quarters. */
+    fun arrange(taskId: Int, where: String) = send("arrange $taskId $where")
+
+    /** Close one window, rather than every window its application happens to have. */
+    fun closeTask(taskId: Int) = send("closetask $taskId")
+
+    /** Send a window to the back, which is what minimising one means on a desktop. */
+    fun minimise(taskId: Int) = send("minimise $taskId")
+
     /** Bring a window back inside that area, for the one that is already off the screen. */
     fun fit(packageName: String) = send("fit $packageName")
 
@@ -429,7 +469,8 @@ class DesktopController private constructor(private val context: Context) {
                 message = "Desktop stopped",
                 displayId = null,
                 client = null,
-                openApps = emptyList()
+                openApps = emptyList(),
+                windows = emptyList()
             )
         }
     }

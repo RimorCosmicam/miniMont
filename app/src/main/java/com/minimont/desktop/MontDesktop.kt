@@ -903,7 +903,16 @@ private fun StartSquares(modifier: Modifier = Modifier, onClick: () -> Unit) {
     }
 }
 
-/** An application in the dock. Running is simply the bright one. */
+/**
+ * An application in the taskbar.
+ *
+ * Full strength whether it is open or not. Dimming the closed ones made half the bar look broken —
+ * these are somebody's own icons, drawn to be seen at full strength, and taking 42% off them says
+ * "disabled" rather than "not currently open".
+ *
+ * The open ones get a small mustard square below the icon instead, clear of it rather than sitting
+ * on its bottom edge. An addition to what is running, rather than a subtraction from what is not.
+ */
 @Composable
 private fun DockItem(
     app: DesktopApp,
@@ -913,28 +922,24 @@ private fun DockItem(
     onHold: () -> Unit
 ) {
     val scale = LocalMontScale.current
-    Box(
+    Column(
         Modifier
-            .size(thickness.icon.dp * scale)
             .secondary(onHold)
             .combinedClickable(onClick = onClick, onLongClick = onHold),
-        contentAlignment = Alignment.Center
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        val icon = app.icon
-        if (icon != null) {
-            Image(
-                icon,
-                contentDescription = app.label,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .alpha(if (running) MontWhite.ACTIVE else MontWhite.DIM)
-            )
-        } else {
-            MontLabel(
-                app.label.take(1).uppercase(),
-                size = 20,
-                alpha = if (running) MontWhite.ACTIVE else MontWhite.DIM
-            )
+        Box(Modifier.size(thickness.icon.dp * scale), contentAlignment = Alignment.Center) {
+            val icon = app.icon
+            if (icon != null) {
+                Image(icon, contentDescription = app.label, modifier = Modifier.fillMaxSize())
+            } else {
+                MontLabel(app.label.take(1).uppercase(), size = 20, alpha = MontWhite.ACTIVE)
+            }
+        }
+        Spacer(Modifier.height(3.dp * scale))
+        // Drawn or not drawn. Nothing announces itself, so there is no faint dot for a closed app.
+        Canvas(Modifier.size(width = 5.dp * scale, height = 3.dp * scale)) {
+            if (running) drawRect(MontAccent.Mustard, size = size)
         }
     }
 }
