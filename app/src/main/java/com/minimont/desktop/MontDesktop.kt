@@ -8,6 +8,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -508,16 +509,18 @@ private fun Taskbar(
 }
 
 /**
- * Back, home and windows, at the left.
+ * Back, home and recents, at the left.
  *
  * All three mean something *inside* miniMont and nothing outside it. Home shows the desktop rather
- * than leaving for the phone's launcher — leaving would end the thing you are using. Windows lists
- * what is open here, not what Android has in its own recents. Back is the only one that is what it
- * looks like: it goes back in whatever has focus.
+ * than leaving for the phone's launcher — leaving would end the thing you are using. Recents lists
+ * what is open here, not what Android has been doing. Back is the only one that is what it looks
+ * like: it goes back in whatever has focus.
  *
- * Words rather than a triangle, a circle and a square. Mont says a thing with a word when a word
- * will do, and these three have been three shapes for fifteen years without anybody agreeing which
- * shape is which.
+ * The shapes are Android's own — arrow, circle, square. Mont's objection is to saying a thing with
+ * a little picture when a word would do, and here a word does not: these three have been the same
+ * three marks on every Android phone for fifteen years, and nobody reads the word on a control they
+ * hit without looking. Drawn as strokes at one weight, dim at rest and bright under the finger,
+ * which is the only state the language gives anything.
  */
 @Composable
 private fun Navigation(
@@ -529,12 +532,66 @@ private fun Navigation(
     val scale = LocalMontScale.current
     Row(
         modifier,
-        horizontalArrangement = Arrangement.spacedBy(14.dp * scale),
+        horizontalArrangement = Arrangement.spacedBy(10.dp * scale),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        MontLabel("BACK", Modifier.combinedClickable(onClick = onBack), alpha = MontWhite.DIM, size = 11)
-        MontLabel("HOME", Modifier.combinedClickable(onClick = onHome), alpha = MontWhite.DIM, size = 11)
-        MontLabel("WINDOWS", Modifier.combinedClickable(onClick = onWindows), alpha = MontWhite.DIM, size = 11)
+        NavMark(Mark.BACK, onBack)
+        NavMark(Mark.HOME, onHome)
+        NavMark(Mark.RECENTS, onWindows)
+    }
+}
+
+private enum class Mark { BACK, HOME, RECENTS }
+
+@Composable
+private fun NavMark(mark: Mark, onClick: () -> Unit) {
+    val scale = LocalMontScale.current
+    var held by remember { mutableStateOf(false) }
+    val alpha = if (held) MontWhite.ACTIVE else MontWhite.DIM
+
+    Box(
+        Modifier
+            .size(ICON.dp * scale)
+            .pointerInput(mark) {
+                detectTapGestures(
+                    onPress = {
+                        held = true
+                        onClick()
+                        tryAwaitRelease()
+                        held = false
+                    }
+                )
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(Modifier.size(15.dp * scale)) {
+            val colour = Color.White.copy(alpha = alpha)
+            val line = Stroke(width = 1.6f * scale)
+            when (mark) {
+                Mark.BACK -> {
+                    val middle = size.height / 2f
+                    val head = size.width * .42f
+                    // A shaft with a head on it, rather than a solid triangle: the triangle reads as
+                    // "play, backwards" at this size and the arrow does not.
+                    drawLine(colour, Offset(size.width, middle), Offset(0f, middle), line.width)
+                    drawLine(colour, Offset(0f, middle), Offset(head, middle - head), line.width)
+                    drawLine(colour, Offset(0f, middle), Offset(head, middle + head), line.width)
+                }
+
+                Mark.HOME -> drawCircle(
+                    colour,
+                    radius = size.minDimension / 2f - line.width / 2f,
+                    style = line
+                )
+
+                Mark.RECENTS -> drawRect(
+                    colour,
+                    topLeft = Offset(line.width / 2f, line.width / 2f),
+                    size = Size(size.width - line.width, size.height - line.width),
+                    style = line
+                )
+            }
+        }
     }
 }
 
