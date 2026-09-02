@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- The wireless debugging port is announced over mDNS and changes every time it is turned on,
+         so it is discovered rather than asked for. -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- The start menu is a list of what is installed, so it has to be able to see what is
+         installed. Nothing is read from those packages beyond a name and an icon. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application
+        android:label="miniMont"
+        android:icon="@drawable/app_icon"
+        android:roundIcon="@drawable/app_icon"
+        android:theme="@style/AppTheme"
+        android:allowBackup="false"
+        android:usesCleartextTraffic="true">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:configChanges="keyboardHidden|orientation|screenSize|density">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+            The pairing strip floats in this service's window.
+
+            Android's six-digit code lives in its own Settings activity, which puts this app in the
+            background at the exact moment the code has to be typed. An accessibility overlay is the
+            one window type that can sit above Settings and stay readable while it is.
+        -->
+        <service
+            android:name=".MontAccessibilityService"
+            android:exported="false"
+            android:label="miniMont"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service" />
+        </service>
+
+        <!--
+            miniMont's own backdrop, launched by the host onto the display it just made.
+
+            Exported because the thing that starts it is `am start` from the shell process, and
+            resizeable because it lives on a freeform display and will be handed whatever size the
+            desktop is running at.
+        -->
+        <activity
+            android:name=".desktop.DesktopActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"
+            android:resizeableActivity="true"
+            android:theme="@style/DesktopTheme"
+            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|density|smallestScreenSize" />
+
+        <!-- Opens the file picker on the phone and closes again. -->
+        <activity
+            android:name=".desktop.WallpaperPickerActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@style/InvisibleTheme" />
+
+        <service
+            android:name=".MontService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps the desktop and its dock alive on the external display." />
+        </service>
+
+        <!-- One number for the status card, and nothing else is kept. -->
+        <service
+            android:name=".desktop.MontNotificationListener"
+            android:exported="false"
+            android:label="miniMont"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

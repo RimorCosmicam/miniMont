@@ -1,0 +1,47 @@
+[HOST] AirMate host starting: 1808x1088/160 freeform
+[NET] Listening on UDP 48620
+[HOST] session stopped
+[HOST] ERROR could not start the session
+android.media.MediaCodec$CodecException: 
+	at android.media.MediaCodec.native_start(Native Method)
+	at android.media.MediaCodec.start(MediaCodec.java:2779)
+	at com.airmate.host.server.Encoder.<init>(Encoder.java:69)
+	at com.airmate.host.server.Server.startSession(Server.java:189)
+	at com.airmate.host.server.Server.$r8$lambda$aoc_oMCWqUJG0I2rpHE4aQYIShk(Server.java:0)
+	at com.airmate.host.server.Server$$ExternalSyntheticLambda2.run(D8$$SyntheticClass:0)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1100)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at java.lang.Thread.run(Thread.java:1572)
+[NET] Client paired: /192.168.1.6:48620
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=0 (0/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=0 (0/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=0 (0/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=0 (0/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=0 (0/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=0 (0/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=0 (0/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=0 (0/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=0 (0/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=0 (0/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=0 (0/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=0 (0/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=0 (0/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=0 (0/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=0 (0/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=0 (0/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=0 (0/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=0 (0/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=0 (0/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=0 (0/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=0 (0/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=0 (0/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=0 (0/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=0 (0/s) droppedNetwork=0 client=paired
+Killed 

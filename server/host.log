@@ -1,0 +1,293 @@
+[HOST] AirMate host starting: 1808x1088/160 freeform
+[NET] Listening on UDP 48620
+[HOST] no control stream; staying up until killed
+[VIDEO] Encoder = c2.exynos.h264.encoder (video/avc)
+[VIDEO] Resolution = 1808x1088, bitrate = 21 Mb/s
+[VIDEO] Frame repeater on: idle desktops resend every 100 ms
+[DEX] Creating virtual display 1808x1088/160 flags=0xffcb
+[DEX] Display created, displayId = 48
+[DEX] Display reports: Display id 48: DisplayInfo{"AirMate", displayId 48, displayGroupId 0, FLAG_PRESENTATION, FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS, FLAG_TRUSTED, FLAG_OWN_DISPLAY_GROUP, FLAG_ALWAYS_UNLOCKED, FLAG_TOUCH_FEEDBACK_DISABLED, FLAG_OWN_FOCUS, real 1808 x 1088, largest app 1808 x 1088, smallest app 1808 x 1088, appVsyncOff 0, presDeadline 16666666, mode 52, renderFrameRate 60.0, hasArrSupport false, frameRateCategoryRate null, supportedRefreshRates [], defaultMode 52, REFRESH_RATE_MODE_NORMAL, userPreferredModeId -1, supportedModes [{id=52, parentModeId=-1, flags=, width=1808, height=1088, fps=60.0, vsync=60.0, alternativeRefreshRates=[], supportedHdrTypes=[]}], appsSupportedModes [{id=52, parentModeId=-1, flags=, width=1808, height=1088, fps=60.0, vsync=60.0, alternativeRefreshRates=[], supportedHdrTypes=[]}], hdrCapabilities null, isForceSdr false, userDisabledHdrTypes [], minimalPostProcessingSupported false, rotation 0, state UNKNOWN, committedState UNKNOWN}, DisplayMetrics{density=1.0, width=1808, height=1088, scaledDensity=1.0, xdpi=160.0, ydpi=160.0}, isValid=true
+[DEX] wm set-display-windowing-mode -d 48 5
+[NET] Client paired: /192.168.1.6:48620
+[HOST] SESSION READY — waiting for an AirMate client to say hello
+[VIDEO] Parameter sets: 30 bytes
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=137 (27/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=235 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=596 (72/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=1041 (89/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=1459 (83/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=1666 (41/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=1894 (45/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=1992 (19/s) droppedNetwork=4 client=paired
+[HOST] resizing to 1600x960
+[HOST] session stopped
+[VIDEO] Encoder = c2.exynos.h264.encoder (video/avc)
+[VIDEO] Resolution = 1600x960, bitrate = 16 Mb/s
+[VIDEO] Frame repeater on: idle desktops resend every 100 ms
+[DEX] Creating virtual display 1600x960/160 flags=0xffcb
+[DEX] Display created, displayId = 49
+[DEX] Display reports: Display id 49: DisplayInfo{"AirMate", displayId 49, displayGroupId 0, FLAG_PRESENTATION, FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS, FLAG_TRUSTED, FLAG_OWN_DISPLAY_GROUP, FLAG_ALWAYS_UNLOCKED, FLAG_TOUCH_FEEDBACK_DISABLED, FLAG_OWN_FOCUS, real 1600 x 960, largest app 1600 x 960, smallest app 1600 x 960, appVsyncOff 0, presDeadline 16666666, mode 53, renderFrameRate 60.0, hasArrSupport false, frameRateCategoryRate null, supportedRefreshRates [], defaultMode 53, REFRESH_RATE_MODE_NORMAL, userPreferredModeId -1, supportedModes [{id=53, parentModeId=-1, flags=, width=1600, height=960, fps=60.0, vsync=60.0, alternativeRefreshRates=[], supportedHdrTypes=[]}], appsSupportedModes [{id=53, parentModeId=-1, flags=, width=1600, height=960, fps=60.0, vsync=60.0, alternativeRefreshRates=[], supportedHdrTypes=[]}], hdrCapabilities null, isForceSdr false, userDisabledHdrTypes [], minimalPostProcessingSupported false, rotation 0, state UNKNOWN, committedState UNKNOWN}, DisplayMetrics{density=1.0, width=1600, height=960, scaledDensity=1.0, xdpi=160.0, ydpi=160.0}, isValid=true
+[DEX] wm set-display-windowing-mode -d 49 5
+[HOST] SESSION READY — waiting for an AirMate client to say hello
+[VIDEO] Parameter sets: 29 bytes
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=2148 (31/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=2244 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=2342 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=2440 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=2537 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=2635 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=2732 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=2830 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=2928 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=3025 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=3123 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=3220 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=3317 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=3415 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=3513 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=3611 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=3709 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=3807 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=3904 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=4002 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=4099 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=4197 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=4294 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=4392 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=4491 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=4589 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=4686 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=4784 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=4881 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=4979 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=5077 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=5175 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=5273 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=5371 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=5468 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=5566 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=5662 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=5761 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=5860 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=5958 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=6056 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=6154 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=6252 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=6350 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=6448 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=6548 (20/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=6646 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=6744 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=6841 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=6938 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=7036 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=7134 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=7232 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=7331 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=7430 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=7527 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=7625 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=7722 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=7819 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=7918 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=8014 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=8112 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=8210 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=8308 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=8406 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=8504 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=8602 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=8699 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=8797 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=8894 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=8993 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=9092 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=9189 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=9287 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=9385 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=9483 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=9580 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=9678 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=9776 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=9874 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=9972 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=10070 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=10168 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=10267 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=10364 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=10463 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=10560 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=10658 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=10756 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=10854 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=10952 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=11050 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=11147 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=11245 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=11343 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=11439 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=11537 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=11635 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=11732 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=11830 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=11929 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=12026 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=12125 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=12222 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=12319 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=12418 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=12515 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=12613 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=12711 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=12808 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=12906 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=13004 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=13103 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=13200 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=13298 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=13395 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=13493 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=13591 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=13688 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=13786 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=13884 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=13982 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=14079 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=14176 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=14274 (19/s) droppedNetwork=4 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=14373 (19/s) droppedNetwork=4 client=paired
+Killed 

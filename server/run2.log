@@ -1,0 +1,312 @@
+[HOST] AirMate host starting: 1920x1080/160 freeform
+[NET] Listening on UDP 48620
+[VIDEO] Encoder = c2.exynos.h264.encoder (video/avc)
+[VIDEO] Resolution = 1920x1080, bitrate = 22 Mb/s
+[NET] Client paired: /192.168.1.6:48620
+[VIDEO] Frame repeater on: idle desktops resend every 100 ms
+[DEX] Creating virtual display 1920x1080/160 flags=0xffcb
+[DEX] Display created, displayId = 31
+[DEX] wm set-display-windowing-mode -d 31 5
+[HOST] SESSION READY — waiting for an AirMate client to say hello
+[VIDEO] Parameter sets: 31 bytes
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[HOST] 1920x1080 is past this client's decoder; refitting to 1808x1088
+[HOST] session stopped
+[VIDEO] Encoder = c2.exynos.h264.encoder (video/avc)
+[VIDEO] Resolution = 1808x1088, bitrate = 21 Mb/s
+[VIDEO] Frame repeater on: idle desktops resend every 100 ms
+[DEX] Creating virtual display 1808x1088/160 flags=0xffcb
+[DEX] Display created, displayId = 32
+[DEX] wm set-display-windowing-mode -d 32 5
+[HOST] SESSION READY — waiting for an AirMate client to say hello
+[VIDEO] Parameter sets: 30 bytes
+[VIDEO] encoded=127 (25/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=224 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=320 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=419 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=517 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=615 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=712 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=809 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=906 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=1004 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=1102 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=1200 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=1299 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=1398 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=1495 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=1593 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=1691 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=1789 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=1887 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=1984 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=2083 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=2180 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=2279 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=2377 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=2474 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=2572 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=2670 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=2768 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=2866 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=2964 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=3062 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=3160 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=3259 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=3357 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=3455 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=3553 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=3651 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=3749 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=3847 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=3945 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=4043 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=4141 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=4238 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=4337 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=4435 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=4533 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=4630 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=4728 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=4825 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=4924 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=5021 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=5120 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=5218 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=5316 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=5427 (22/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=5524 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=5622 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=5721 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=5819 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=5917 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=6013 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=6112 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=6209 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=6308 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=6406 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=6504 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=6603 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=6701 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=6798 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=6896 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=6994 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=7091 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=7189 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=7287 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=7385 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=7483 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=7581 (19/s) droppedNetwork=0 client=paired
+[HOST] client panel 2000x1200, decoder ceiling 1808x1088
+[VIDEO] encoded=7679 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=7803 (24/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=7900 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=7998 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=8122 (24/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=8220 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=8318 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=8427 (21/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=8533 (21/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=8631 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=8730 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=8845 (23/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=8942 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=9040 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=9137 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=9236 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=9385 (29/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=9483 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=9581 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=9680 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=9779 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=9876 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=9974 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=10072 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=10189 (23/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=10287 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=10383 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=10497 (22/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=10594 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=10691 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=10808 (23/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=10904 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=11001 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=11114 (22/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=11210 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=11307 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=11405 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=11502 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=11599 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=11698 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=11795 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=11891 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=11988 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=12085 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=12183 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=12281 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=12378 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=12476 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=12574 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=12671 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=12769 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=12867 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=12964 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=13060 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=13156 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=13254 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=13350 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=13453 (20/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=13560 (21/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=13656 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=13752 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=13846 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=13942 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=14035 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=14131 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=14226 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=14321 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=14413 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=14509 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=14602 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=14698 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=14795 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=14900 (21/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=14996 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=15093 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=15188 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=15280 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=15374 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=15469 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=15564 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=15656 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=15752 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=15848 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=15943 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=16040 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=16135 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=16229 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=16324 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=16420 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=16514 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=16608 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=16703 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=16796 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=16899 (20/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=16994 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=17089 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=17194 (21/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=17290 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=17386 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=17484 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=17575 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=17666 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=17766 (20/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=17862 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=17957 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=18052 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=18145 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=18243 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=18335 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=18427 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=18522 (19/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=18614 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=18705 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=18795 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=18889 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=18982 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=19074 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=19167 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=19261 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=19353 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=19447 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=19541 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=19635 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=19726 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=19820 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=19914 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=20007 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=20096 (17/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=20190 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=20284 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=20376 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=20468 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=20562 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=20654 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=20748 (18/s) droppedNetwork=0 client=paired
+[VIDEO] encoded=20843 (19/s) droppedNetwork=0 client=paired
+Killed 

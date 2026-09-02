@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">miniMont</string>
+    <string name="accessibility_description">Lets miniMont float the pairing panel over Android\'s wireless debugging screen, and deliver taps and scrolls from the tablet onto the miniMont display.</string>
+</resources>
