@@ -58,6 +58,13 @@ public final class Desktop {
     }
 
     /**
+     * Open one of the phone's own screens, named by what it does rather than by which class does it.
+     *
+     * Samsung's settings screens have no component name worth writing down — they move and get
+     * renamed — but they all answer an action. Launched like anything else, so they land on the
+     * desktop as a window and are fitted into the apps area with the rest.
+     */
+    /**
      * Open an app on the desktop, and make sure that is where it opened.
      *
      * `am start --display` only means what it says when the app has no task already. When it has
@@ -70,6 +77,18 @@ public final class Desktop {
      * framework refuses to move it, open a second window of it here. Two windows is a worse answer
      * than one in the right place, and a better one than a desktop whose apps open behind you.
      */
+    public static boolean open(int displayId, String action) {
+        String command = "am start -a " + action
+                + " --display " + displayId
+                + " --windowingMode " + FREEFORM
+                + " -f 0x" + Integer.toHexString(NEW_TASK);
+        String output = run(command);
+        boolean failed = output.contains("Error:") || output.contains("Exception");
+        Ln.i("DESKTOP", (failed ? "could not open " : "opened ") + action
+                + (failed ? ": " + output.trim() : ""));
+        return !failed;
+    }
+
     public static boolean launch(int displayId, String component) {
         String packageName = packageOf(component);
         start(displayId, component, FREEFORM, false);
