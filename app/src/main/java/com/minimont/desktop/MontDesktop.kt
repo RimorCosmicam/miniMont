@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -1299,6 +1300,24 @@ private fun NotificationsCard(onClose: () -> Unit) {
     }
 }
 
+/** The title's size, and the measure everything else in a notification is set against. */
+private const val NOTE_TITLE = 13
+
+/** What the notification said, in the black that everything on this white ground is written in. */
+@Composable
+private fun NoteText(text: String, modifier: Modifier = Modifier) {
+    val scale = LocalMontScale.current
+    Text(
+        text,
+        modifier = modifier,
+        color = Color.Black,
+        fontFamily = Mont,
+        fontWeight = FontWeight.Normal,
+        fontSize = (12 * scale).sp,
+        lineHeight = (16 * scale).sp
+    )
+}
+
 /** One notification: its own bar, and the white box under it holding what it said. */
 @Composable
 private fun NoteCard(note: Note) {
@@ -1316,7 +1335,7 @@ private fun NoteCard(note: Note) {
             MontLabel(
                 note.title.ifBlank { note.app }.uppercase(),
                 Modifier.weight(1f),
-                size = 13,
+                size = NOTE_TITLE,
                 alpha = MontWhite.ACTIVE
             )
             MontLabel(
@@ -1324,7 +1343,7 @@ private fun NoteCard(note: Note) {
                 Modifier
                     .combinedClickable { Notifications.dismiss(note.key) }
                     .padding(start = 8.dp * scale),
-                size = 13,
+                size = NOTE_TITLE,
                 alpha = MontWhite.ACTIVE
             )
         }
@@ -1336,25 +1355,27 @@ private fun NoteCard(note: Note) {
                 .background(Color.White)
                 .padding(horizontal = 8.dp * scale, vertical = 7.dp * scale)
         ) {
-            if (note.text.isNotBlank()) {
-                Text(
-                    note.text,
-                    color = Color.Black,
-                    fontFamily = Mont,
-                    fontWeight = FontWeight.Normal,
-                    fontSize = (12 * scale).sp,
-                    lineHeight = (16 * scale).sp
-                )
-            }
-
-            note.picture?.let { picture ->
-                if (note.text.isNotBlank()) Spacer(Modifier.height(6.dp * scale))
-                Image(
-                    picture,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxWidth(),
-                    contentScale = ContentScale.FillWidth
-                )
+            // A picture sits beside the words, not over them, and is capped at three times the
+            // title. Left to itself a notification's image is a full-width photograph, and a
+            // conversation of them becomes a gallery you have to scroll past to read anything.
+            val picture = note.picture
+            if (picture != null) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                    Image(
+                        picture,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .height((NOTE_TITLE * 3).dp * scale)
+                            .widthIn(max = (NOTE_TITLE * 6).dp * scale),
+                        contentScale = ContentScale.Fit
+                    )
+                    if (note.text.isNotBlank()) {
+                        Spacer(Modifier.width(8.dp * scale))
+                        NoteText(note.text, Modifier.weight(1f))
+                    }
+                }
+            } else if (note.text.isNotBlank()) {
+                NoteText(note.text)
             }
 
             // Whatever the notification itself offered, at the bottom right of its own box, in the
