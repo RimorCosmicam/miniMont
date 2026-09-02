@@ -56,7 +56,8 @@ public final class Server {
     private FrameRepeater repeater;
     private MontDisplay display;
     private Input input;
-    private Pointer pointer;
+    /** Read by the control thread and written by the session thread, so it is read as it is. */
+    private volatile Pointer pointer;
 
     private int width;
     private int height;
@@ -205,7 +206,14 @@ public final class Server {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     String command = line.trim();
-                    if (!command.isEmpty()) session.execute(() -> control(command));
+                    if (command.isEmpty()) continue;
+                    // Pointer verbs run on this thread. Everything else — launching, closing,
+                    // resizing — goes to the session thread, and a launch waits there for the
+                    // framework to finish moving a window. Sharing one thread would stall the
+                    // cursor for a second every time somebody opened something, which is the one
+                    // delay a pointer cannot have.
+                    if (hot(command)) control(command);
+                    else session.execute(() -> control(command));
                 }
             } catch (Exception ignored) {
                 // A broken pipe says the same thing EOF does.
@@ -220,6 +228,15 @@ public final class Server {
         }, "miniMont-Watchdog");
         watchdog.setDaemon(true);
         watchdog.start();
+    }
+
+    /** Whether a line is one of the verbs sent at the rate a finger moves. */
+    private static boolean hot(String line) {
+        if (line.length() < 2 || line.charAt(1) != ' ') return false;
+        switch (line.charAt(0)) {
+            case 'm': case 'b': case 'w': case 'k': case 't': return true;
+            default: return false;
+        }
     }
 
     /**
