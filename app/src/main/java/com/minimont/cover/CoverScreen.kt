@@ -41,6 +41,7 @@ import com.minimont.cover.touchpad.EdgeControls
 import com.minimont.cover.touchpad.EdgeRefractionSurface
 import com.minimont.cover.touchpad.TouchpadView
 import com.minimont.ui.mont.MontAccent
+import com.minimont.ui.mont.MontCard
 import com.minimont.ui.mont.MontChips
 import com.minimont.ui.mont.MontDetail
 import com.minimont.ui.mont.MontLabel
@@ -290,52 +291,53 @@ private fun Keys(
 /**
  * Everything about the picture, and nothing about the desktop.
  *
- * The resolutions are a fact about the tablet at the other end, they are only meaningful while
- * something is being sent to it, and changing one rebuilds the display — which is not a thing to
- * have one tap away from a pointer surface.
+ * A Mont card, not a screen. On the cover display a surface is a full-width black rectangle held off
+ * the top edge, sized to what is in it and scrolling inside a cap if there is more — it is not a
+ * page that paints out the field behind it. The field stays; the card sits on it.
+ *
+ * The resolutions live here because they are a fact about the tablet at the other end, they are only
+ * meaningful while something is being sent to it, and changing one rebuilds the display — which is
+ * not a thing to have one tap away from a pointer surface.
  */
 @Composable
 private fun AirMatePage(controller: DesktopController, onStop: () -> Unit) {
     val state by controller.state.collectAsState()
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = .92f))
-            .padding(start = 22.dp, top = 20.dp, end = 14.dp, bottom = 16.dp)
-    ) {
-        MontLabel("AIRMATE", size = 16, alpha = MontWhite.PRIMARY)
-        Spacer(Modifier.height(4.dp))
-        MontDetail(
-            when {
-                state.client != null && state.size != null ->
-                    "Sending ${state.size?.first} × ${state.size?.second} to ${state.client}."
-                state.running -> "Running. Open AirMate on the tablet and it will find this."
-                state.busy -> "Starting…"
-                else -> state.message.ifBlank { "Not sending." }
+    Box(Modifier.fillMaxSize()) {
+        MontCard(Modifier.fillMaxWidth().align(Alignment.TopStart)) {
+            MontLabel("AIRMATE", size = 16, alpha = MontWhite.PRIMARY)
+            Spacer(Modifier.height(4.dp))
+            MontDetail(
+                when {
+                    state.client != null && state.size != null ->
+                        "Sending ${state.size?.first} × ${state.size?.second} to ${state.client}."
+                    state.running -> "Running. Open AirMate on the tablet and it will find this."
+                    state.busy -> "Starting…"
+                    else -> state.message.ifBlank { "Not sending." }
+                }
+            )
+
+            Spacer(Modifier.height(14.dp))
+            MontLabel("RESOLUTION", size = 11, alpha = MontWhite.DETAIL)
+            Spacer(Modifier.height(6.dp))
+            val choices = state.choices
+            MontChips(
+                options = choices.map { "${it.first} × ${it.second}" },
+                selected = choices.indexOf(state.size)
+            ) { index ->
+                val (width, height) = choices[index]
+                controller.setResolution(width, height)
             }
-        )
+            Spacer(Modifier.height(4.dp))
+            MontDetail("Changing this rebuilds the display.")
 
-        Spacer(Modifier.height(16.dp))
-        MontLabel("RESOLUTION", size = 11, alpha = MontWhite.DETAIL)
-        Spacer(Modifier.height(6.dp))
-        val choices = state.choices
-        MontChips(
-            options = choices.map { "${it.first} × ${it.second}" },
-            selected = choices.indexOf(state.size)
-        ) { index ->
-            val (width, height) = choices[index]
-            controller.setResolution(width, height)
-        }
-        Spacer(Modifier.height(6.dp))
-        MontDetail("Changing this rebuilds the display.")
+            Spacer(Modifier.height(14.dp))
+            MontRow(label = "Stop the desktop") { onStop() }
 
-        Spacer(Modifier.height(20.dp))
-        MontRow(label = "Stop the desktop") { onStop() }
-
-        if (state.stage == DesktopStage.FAILED) {
-            Spacer(Modifier.height(10.dp))
-            MontLabel(state.message, size = 11, colour = MontAccent.Danger, alpha = 1f)
+            if (state.stage == DesktopStage.FAILED) {
+                Spacer(Modifier.height(8.dp))
+                MontLabel(state.message, size = 11, colour = MontAccent.Danger, alpha = 1f)
+            }
         }
     }
 }
