@@ -182,10 +182,10 @@ class MainActivity : ComponentActivity() {
             // Once the desktop is up, this screen stops being about the desktop and becomes the
             // thing you drive it with. Nobody looks at the cover display from here on; they touch
             // it while looking at the other one.
-            CoverScreen(controller) {
-                controller.stop()
-                MontService.stop(this@MainActivity)
-            }
+            // Only the desktop stops. The service stays: it is what draws the taskbar, it costs
+            // nothing while there is no display to draw on, and stopping it here is what made the
+            // taskbar never come back after a restart.
+            CoverScreen(controller) { controller.stop() }
         } else {
             DesktopCard(controller)
         }

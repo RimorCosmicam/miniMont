@@ -125,6 +125,18 @@ class MontService : Service() {
         super.onDestroy()
     }
 
+    /**
+     * Asked to start again while already running, which happens on every desktop start.
+     *
+     * Re-checks for a display rather than assuming the one it has: the host is a separate process
+     * that may have been restarted underneath us, and a new session means a new display id even
+     * though the name is the same.
+     */
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        attach()
+        return START_STICKY
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun notification(running: Boolean): Notification {
