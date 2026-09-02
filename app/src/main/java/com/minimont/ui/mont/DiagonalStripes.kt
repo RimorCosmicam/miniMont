@@ -50,6 +50,14 @@ fun DiagonalStripes(
         }
 
         rotate(degrees = 26.565f) {
+            // One sheet while it is one sheet. Cutting it down the middle and drawing two clipped
+            // halves that happen to meet leaves a hairline where they touch — a seam down the
+            // centre of the screen that is not a design, it is an artefact of a split of zero.
+            if (pull == 0f) {
+                half(middle - span, 0f)
+                half(middle, 0f)
+                return@rotate
+            }
             clipRect(-span, -span, middle, size.height + span) { half(middle - span, -pull) }
             clipRect(middle, -span, size.width + span, size.height + span) { half(middle, pull) }
         }

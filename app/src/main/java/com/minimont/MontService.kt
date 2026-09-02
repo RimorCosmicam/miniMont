@@ -9,6 +9,7 @@ import android.content.Intent
 import android.hardware.display.DisplayManager
 import android.os.IBinder
 import com.minimont.desktop.AppCatalog
+import com.minimont.desktop.CursorLayer
 import com.minimont.desktop.DesktopChrome
 import com.minimont.desktop.DesktopStore
 import com.minimont.desktop.WallpaperPickerActivity
@@ -34,6 +35,7 @@ class MontService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var controller: DesktopController
     private var chrome: DesktopChrome? = null
+    private var cursor: CursorLayer? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -71,6 +73,8 @@ class MontService : Service() {
         val display = displays.displays.firstOrNull { it.name == DISPLAY_NAME }
         if (display?.displayId == attachedTo) return
 
+        cursor?.let { runCatching { it.dismiss() } }
+        cursor = null
         chrome?.let { runCatching { it.dismiss() } }
         chrome = null
         attachedTo = display?.displayId
@@ -81,6 +85,10 @@ class MontService : Service() {
         if (display == null) return
 
         chrome = DesktopChrome(this, display, controller, ::pickWallpaper, ::grantNotifications)
+            .also { runCatching { it.show() } }
+        // After the dock, so it is above it. A cursor that slides under the thing it is pointing at
+        // is a cursor you cannot use to press the thing it is pointing at.
+        cursor = CursorLayer(this, display, controller)
             .also { runCatching { it.show() } }
     }
 
@@ -109,6 +117,8 @@ class MontService : Service() {
 
     override fun onDestroy() {
         runCatching { displays.unregisterDisplayListener(listener) }
+        cursor?.dismiss()
+        cursor = null
         chrome?.dismiss()
         chrome = null
         scope.cancel()

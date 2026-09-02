@@ -24,10 +24,22 @@ import kotlinx.coroutines.withContext
  * would not start, started but the desktop has not appeared — and each of them wants a different
  * sentence in front of the user.
  */
-private val FALLBACK = listOf(1920 to 1080, 1600 to 900, 1280 to 800)
-
-private fun snap(value: Double): Int =
-    (Math.round(value / 16).toInt() * 16).coerceAtLeast(16)
+/**
+ * The sizes a desktop is actually run at.
+ *
+ * Not derived from the tablet's panel. Scaling the panel's own shape produces sizes like
+ * 1808 x 1088 — inside every limit the decoder states, and decoded as a black screen with
+ * fragments over it. Hardware agrees on the sizes everybody uses and quietly disagrees on the
+ * ones nobody does, so the list is the ordinary ones and the picture is letterboxed when the
+ * tablet is a different shape.
+ */
+private val LADDER = listOf(
+    1920 to 1080,
+    1600 to 900,
+    1280 to 800,
+    1280 to 720,
+    1024 to 768
+)
 
 enum class DesktopStage {
     IDLE,
@@ -62,27 +74,12 @@ data class DesktopState(
      */
     val openApps: List<String> = emptyList()
 ) {
-    /**
-     * The sizes worth offering, at the client's own shape.
-     *
-     * The same derivation the client and the Mac both make, so no two ends of AirMate ever propose
-     * shapes the others do not recognise. Sides snap to multiples of sixteen because hardware
-     * decoders refuse anything else however far inside their stated limits it is, and anything
-     * above the client's ceiling is dropped — past that there is no picture at all.
-     */
+    /** The sizes worth offering: the ordinary ones, minus anything past the client's decoder. */
     val choices: List<Pair<Int, Int>>
         get() {
-            val screen = panel ?: return FALLBACK
-            val derived = listOf(1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4)
-                .map { scale -> snap(screen.first * scale) to snap(screen.second * scale) }
-                .filter { it.first >= 640 && it.second >= 480 }
-                .filter { candidate ->
-                    val limit = ceiling ?: return@filter true
-                    candidate.first <= limit.first && candidate.second <= limit.second
-                }
-                .distinct()
-                .take(4)
-            return derived.ifEmpty { FALLBACK }
+            val limit = ceiling ?: return LADDER
+            return LADDER.filter { it.first <= limit.first && it.second <= limit.second }
+                .ifEmpty { listOf(LADDER.last()) }
         }
 
     val running: Boolean get() = stage == DesktopStage.RUNNING
@@ -185,6 +182,7 @@ class DesktopController private constructor(private val context: Context) {
                 fail("Wireless debugging is not switched on, so there is nothing to connect to.")
                 return@launch
             }
+            _cursor.value = 0f to 0f
             _state.update { it.copy(stage = DesktopStage.CONNECTING, message = "Connecting…") }
             val host = mdns.host.value
 
@@ -260,7 +258,14 @@ class DesktopController private constructor(private val context: Context) {
                         // client cannot decode the size we chose, so the two diverge routinely.
                         line.contains("Resolution = ") -> {
                             val size = parseSize(line.substringAfter("Resolution = "))
-                            if (size != null) _state.update { it.copy(size = size) }
+                            if (size != null) {
+                                // The host puts its pointer in the middle of a new display, because
+                                // a cursor that appears in the corner looks like one that failed.
+                                // This end has to start from the same place or the drawn cursor and
+                                // the real one disagree from the first movement.
+                                _cursor.value = size.first / 2f to size.second / 2f
+                                _state.update { it.copy(size = size) }
+                            }
                         }
 
                         line.contains("client panel ") -> {
@@ -342,8 +347,29 @@ class DesktopController private constructor(private val context: Context) {
         }
     }
 
+    /**
+     * Where the cursor is, so something can draw it.
+     *
+     * The framework does not draw a pointer for injected events — the sprite on a real display is
+     * driven by the input reader from real hardware, and nothing we inject reaches it. Clicks land
+     * regardless, which is why the desktop worked and was impossible to aim. So miniMont keeps the
+     * position it has been sending and draws the cursor itself.
+     *
+     * Kept here rather than asked of the host: this end already knows every delta it sent, and a
+     * round trip per motion event to be told what we just said would be a cursor that lags the
+     * finger by a network.
+     */
+    private val _cursor = MutableStateFlow(0f to 0f)
+    val cursor = _cursor.asStateFlow()
+
     /** Relative pointer movement, as the touchpad produces it. */
-    fun move(dx: Float, dy: Float) = send("m ${dx.round()} ${dy.round()}")
+    fun move(dx: Float, dy: Float) {
+        send("m ${dx.round()} ${dy.round()}")
+        val (width, height) = _state.value.size ?: return
+        _cursor.update { (x, y) ->
+            (x + dx).coerceIn(0f, width - 1f) to (y + dy).coerceIn(0f, height - 1f)
+        }
+    }
 
     /** A mouse button, held for exactly as long as the finger is. 1 left, 2 right, 3 middle. */
     fun button(button: Int, down: Boolean) = send("b $button ${if (down) 1 else 0}")

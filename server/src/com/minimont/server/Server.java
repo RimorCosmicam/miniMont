@@ -474,28 +474,30 @@ public final class Server {
     }
 
     /**
-     * The largest size at the client's own shape that its decoder will accept.
+     * The largest ordinary desktop size the client's decoder will accept.
      *
-     * The same derivation the client makes in `resolutionsFor`, so the size chosen here is one the
-     * client would itself have offered. Sides snap to multiples of sixteen because hardware
-     * decoders refuse anything else however far inside their stated limits it is — 1800 x 1080 is
-     * refused by a decoder that accepts the larger 1808 x 1088.
+     * This used to derive sizes from the client's own panel — 2000 x 1200 scaled down and snapped
+     * to sixteen, which produces shapes like 1808 x 1088. They are inside every stated limit and
+     * they decode into a black screen with fragments scattered across it: encoders and decoders
+     * agree on the sizes everybody uses and quietly disagree on the ones nobody does.
+     *
+     * So the ladder is fixed, and it is the sizes a desktop is actually run at. The picture is
+     * letterboxed on a panel of a different shape, which is a visible compromise rather than an
+     * invisible corruption.
      */
+    private static final int[][] LADDER = {
+            { 1920, 1080 },
+            { 1600, 900 },
+            { 1280, 800 },
+            { 1280, 720 },
+            { 1024, 768 },
+    };
+
     private static int[] fit(int panelWidth, int panelHeight, int maxWidth, int maxHeight) {
-        double[] scales = {1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4};
-        for (double scale : scales) {
-            int candidateWidth = snap(panelWidth * scale);
-            int candidateHeight = snap(panelHeight * scale);
-            if (candidateWidth < 640 || candidateHeight < 480) continue;
-            if (candidateWidth <= maxWidth && candidateHeight <= maxHeight) {
-                return new int[] { candidateWidth, candidateHeight };
-            }
+        for (int[] candidate : LADDER) {
+            if (candidate[0] <= maxWidth && candidate[1] <= maxHeight) return candidate;
         }
         return null;
-    }
-
-    private static int snap(double value) {
-        return Math.max(16, (int) Math.round(value / 16) * 16);
     }
 
     private void onAccessUnit(byte[] data, int length, long captureNanos, boolean keyframe, boolean hevc) {
