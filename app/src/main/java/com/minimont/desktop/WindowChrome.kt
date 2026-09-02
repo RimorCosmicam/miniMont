@@ -161,6 +161,7 @@ private class CaptionWindow(
 
     private var title by mutableStateOf("")
     private var menu by mutableStateOf(false)
+    private var bounds: DesktopWindow? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -186,7 +187,7 @@ private class CaptionWindow(
                         Modifier
                             .size(12.dp)
                             .background(MontAccent.Mustard)
-                            .combinedClickable { menu = !menu }
+                            .combinedClickable { open(!menu) }
                     )
                 }
 
@@ -207,16 +208,16 @@ private class CaptionWindow(
                         ).forEach { (label, where) ->
                             MontRow(label = label) {
                                 controller.arrange(taskId, where)
-                                menu = false
+                                open(false)
                             }
                         }
                         MontRow(label = "Minimise") {
                             controller.minimise(taskId)
-                            menu = false
+                            open(false)
                         }
                         MontRow(label = "Close") {
                             controller.closeTask(taskId)
-                            menu = false
+                            open(false)
                         }
                     }
                 }
@@ -226,13 +227,37 @@ private class CaptionWindow(
 
     fun place(window: DesktopWindow, name: String) {
         title = name
+        bounds = window
+        apply()
+    }
+
+    /**
+     * Open or close the menu, and resize the window to match.
+     *
+     * This is the whole reason the height is not simply left at its largest. A window is touchable
+     * over all of itself, so a caption that always reserved room for its menu was 260 pixels of
+     * invisible chrome lying across the top of every application, swallowing every click that
+     * landed there. It is the height of the caption and nothing more until there is a menu in it.
+     */
+    private fun open(show: Boolean) {
+        menu = show
+        apply()
+    }
+
+    private fun apply() {
+        val window = bounds ?: return
         // Above the window's own top edge, so the caption never covers the app's first line.
-        move(window.left, window.top - CAPTION, window.right - window.left, CAPTION + MENU)
+        move(
+            window.left,
+            window.top - CAPTION,
+            window.right - window.left,
+            if (menu) CAPTION + MENU else CAPTION
+        )
     }
 
     private companion object {
-        /** Room for the arrangement menu to open into without moving the window. */
-        const val MENU = 260
+        /** Room for the arrangement menu, and only while one is open. */
+        const val MENU = 250
     }
 }
 
@@ -259,6 +284,13 @@ private abstract class ChromeWindow(context: Context, display: Display) :
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
             )
+            // A single pixel, off in the corner, until something says where this belongs.
+            //
+            // A dialog with no layout set is MATCH_PARENT, so an unplaced caption was an invisible
+            // touchable sheet across the whole display: no chrome to see anywhere, and nothing on
+            // the desktop clickable. Both symptoms, from one missing line. Whatever goes wrong from
+            // here, an unplaced piece of chrome is one pixel that swallows nothing.
+            setLayout(1, 1)
         }
         setCancelable(false)
     }
