@@ -40,6 +40,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
@@ -112,10 +113,24 @@ private object Phone {
 private fun Modifier.secondary(onClick: () -> Unit): Modifier = this.pointerInput(onClick) {
     awaitPointerEventScope {
         while (true) {
-            val event = awaitPointerEvent()
-            if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) {
-                event.changes.forEach { it.consume() }
-                onClick()
+            val event = awaitPointerEvent(PointerEventPass.Initial)
+            if (event.type != PointerEventType.Press || !event.buttons.isSecondaryPressed) continue
+
+            event.changes.forEach { it.consume() }
+            onClick()
+
+            // Swallow the rest of the gesture, not just the press that started it.
+            //
+            // Consuming only the press left the release for the ordinary click handler, which then
+            // did what a left click does — so the menu opened on the press and was closed again by
+            // its own release, a frame later. Everything until the last finger lifts belongs to
+            // this gesture, and the Initial pass is where to take it: before anything else has
+            // looked at it.
+            var pressed = true
+            while (pressed) {
+                val rest = awaitPointerEvent(PointerEventPass.Initial)
+                rest.changes.forEach { it.consume() }
+                pressed = rest.changes.any { it.pressed }
             }
         }
     }
