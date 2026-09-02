@@ -183,11 +183,29 @@ class DesktopController private constructor(private val context: Context) {
             }
             _state.update { it.copy(stage = DesktopStage.CONNECTING, message = "Connecting…") }
             val host = mdns.host.value
-            client.connectTo(host, port).onFailure { failure ->
-                // A key adbd has forgotten looks exactly like a key it never had.
-                fail("The device would not accept the connection. Pair again.", failure)
+
+            // Both doors, in order. mDNS announces the wireless-debugging port and that is the one
+            // pairing authorised; 5555 is there whenever somebody has turned on adb over TCP, and
+            // it accepts the same key. Trying the second costs one refused socket and saves a
+            // six-digit code that was never needed.
+            var failure: Throwable? = null
+            val connected = listOf(port, LEGACY_PORT).distinct().any { candidate ->
+                client.connectTo(host, candidate)
+                    .onFailure { failure = it }
+                    .isSuccess
+            }
+            if (!connected) {
+                fail(
+                    "Wireless debugging would not accept the connection. Switch it on in " +
+                        "Developer options and try again.",
+                    failure
+                )
                 return@launch
             }
+            // adbd is the authority on whether it has our key, not a preference we wrote down. A
+            // connection that succeeds *is* the pairing, however it was arrived at.
+            context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+                .edit().putBoolean(KEY_PAIRED, true).apply()
             _state.update { it.copy(stage = DesktopStage.CONNECTED, message = "Connected") }
             launchHost(width, height, density)
         }
@@ -377,5 +395,8 @@ class DesktopController private constructor(private val context: Context) {
         private const val PREFERENCES = "minimont"
         private const val KEY_PAIRED = "paired"
         private const val LOG_LINES = 60
+
+        /** adb over TCP, when somebody has turned it on. Same key, no code. */
+        private const val LEGACY_PORT = 5555
     }
 }

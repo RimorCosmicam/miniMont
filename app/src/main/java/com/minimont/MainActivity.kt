@@ -7,9 +7,16 @@ import android.provider.Settings
 import android.view.Display
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -31,13 +38,14 @@ import com.minimont.ui.PairingOverlay
 import com.minimont.ui.PairingStrip
 import com.minimont.ui.Requirement
 import com.minimont.ui.Welcome
+import com.minimont.ui.mont.DiagonalStripes
+import com.minimont.ui.mont.MONT_SURFACE_ALPHA
+import com.minimont.ui.mont.MontAccent
 import com.minimont.ui.mont.MontDetail
 import com.minimont.ui.mont.MontChips
 import com.minimont.ui.mont.MontLabel
 import com.minimont.ui.mont.MontRow
-import com.minimont.ui.mont.MontToggle
 import com.minimont.ui.mont.MontWhite
-import com.minimont.ui.mont.MontStage
 import com.minimont.ui.mont.MontWordmark
 
 /**
@@ -56,8 +64,6 @@ class MainActivity : ComponentActivity() {
     private var code by mutableStateOf("")
     private var port by mutableStateOf("")
 
-    /** Whether to let One UI decorate miniMont's display. Off is miniMont; on is a measurement. */
-    private var decorations by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -131,22 +137,50 @@ class MainActivity : ComponentActivity() {
                 }
             )
         } else {
-            HostCard(controller)
+            DesktopCard(controller)
         }
     }
 
     /**
-     * The running host, as two facts.
+     * The desktop, as two facts, on a card over stripes.
      *
-     * One row that starts or stops the desktop, and the sizes it can run at. Nothing else: the
-     * display id, the frame counters and the host's own log are all things the machine knows and
-     * nobody asked to see, and a card that lists them is a card you have to read rather than use.
+     * One row that starts or stops it, and the sizes it can run at. Nothing else: the display id,
+     * the frame counters and the host's own log are all things the machine knows and nobody asked
+     * to see, and a card that lists them is a card you have to read rather than use.
+     *
+     * The stripes behind it are not decoration and are not here because the screen looked empty.
+     * They are the one place in Mont where colour carries a state across a whole surface, and this
+     * screen has exactly three states worth telling apart at arm's length: mustard while there is
+     * no desktop yet, green while one is running, red when something refused.
      */
     @Composable
-    private fun HostCard(controller: DesktopController) {
+    private fun DesktopCard(controller: DesktopController) {
         val state by controller.state.collectAsState()
+        val transition = rememberInfiniteTransition(label = "desktop")
+        val travel by transition.animateFloat(
+            0f, 1f, infiniteRepeatable(tween(5200, easing = LinearEasing)), label = "stripes"
+        )
+        val accent = when (state.stage) {
+            DesktopStage.RUNNING -> MontAccent.Live
+            DesktopStage.FAILED -> MontAccent.Danger
+            else -> MontAccent.Mustard
+        }
+
         Box(Modifier.fillMaxSize().background(Color.Black)) {
-            MontStage {
+            DiagonalStripes(
+                travel = travel,
+                first = accent,
+                second = Color.Black,
+                modifier = Modifier.fillMaxSize()
+            )
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.Center)
+                    .padding(horizontal = 18.dp)
+                    .background(Color.Black.copy(MONT_SURFACE_ALPHA))
+                    .padding(start = 22.dp, top = 22.dp, end = 18.dp, bottom = 16.dp)
+            ) {
                 MontWordmark()
                 Spacer(Modifier.height(18.dp))
 
@@ -167,20 +201,7 @@ class MainActivity : ComponentActivity() {
                         MontService.stop(this@MainActivity)
                     }
                 } else {
-                    // The measurement, on the cover screen rather than in a rebuild: with this off
-                    // the display comes up empty and miniMont draws the desktop, which is the whole
-                    // design; with it on One UI puts its own desktop there, which is how to tell a
-                    // display that will not host a window from one that will.
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        MontLabel("ONE UI DECORATIONS", Modifier.weight(1f), alpha = MontWhite.DIM)
-                        MontToggle(decorations, { decorations = it })
-                    }
-                    Spacer(Modifier.height(10.dp))
                     MontRow(label = "Start the desktop", enabled = !state.busy) {
-                        controller.decorations = decorations
-                        // The service comes up first: it is what puts the dock on the display, and
-                        // the display can arrive before a service started afterwards is listening.
-                        MontService.start(this@MainActivity)
                         controller.start()
                     }
                 }
