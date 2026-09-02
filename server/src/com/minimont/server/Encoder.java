@@ -46,6 +46,19 @@ public final class Encoder {
         String mime = preferHevc && supports(HEVC) ? HEVC : H264;
         this.hevc = HEVC.equals(mime);
 
+        // The codec is created before the format is written, because one of the settings below
+        // depends on what this particular encoder can do and there is no way to ask except to hold
+        // one. Nothing is started until the format is complete.
+        MediaCodec built = MediaCodec.createEncoderByType(mime);
+        boolean intraRefresh = false;
+        try {
+            intraRefresh = built.getCodecInfo()
+                    .getCapabilitiesForType(mime)
+                    .isFeatureSupported(MediaCodecInfo.CodecCapabilities.FEATURE_IntraRefresh);
+        } catch (Throwable unknown) {
+            // An encoder that will not answer the question is an encoder we do not ask again.
+        }
+
         MediaFormat format = MediaFormat.createVideoFormat(mime, width, height);
         format.setInteger(MediaFormat.KEY_COLOR_FORMAT,
                 MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
@@ -57,12 +70,40 @@ public final class Encoder {
         // that move are a cursor and a window. What it was buying was not detail, it was a send
         // queue that could not keep up, and a fragment dropped from a frame is worse than a frame
         // encoded slightly softer.
-        int bitrate = (int) Math.min(24_000_000L, Math.max(6_000_000L, pixels * 60 * 9 / 100));
+        int bitrate = (int) Math.min(24_000_000L, Math.max(8_000_000L, pixels * 30 * 22 / 100));
         format.setInteger(MediaFormat.KEY_BIT_RATE, bitrate);
-        format.setInteger(MediaFormat.KEY_FRAME_RATE, 60);
-        // One second rather than two. A lost fragment corrupts everything until the next keyframe,
-        // so this is not a quality setting, it is how long a mistake stays on screen.
-        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
+
+        // Thirty, because thirty is what a desktop actually produces.
+        //
+        // This declaration is not a request, it is the divisor: rate control spends
+        // bitrate ÷ frame rate on each picture. Claiming sixty while delivering nineteen told the
+        // encoder to budget 116 kbit a frame and then handed it a third of the frames to spend it
+        // on — so every picture was coded thin, detail dissolved between keyframes, and the
+        // keyframe arrived and put it all back at once. That is the smear, and the flash at the end
+        // of it, and neither was the network.
+        format.setInteger(MediaFormat.KEY_FRAME_RATE, 30);
+
+        // Variable rate, deliberately. A desktop is still most of the time and constant rate pads
+        // a motionless picture up to its quota for no reason, spending on nothing the bandwidth
+        // that a moving window needs. The send buffer is large enough now to take the bursts that
+        // variable rate produces.
+
+        if (intraRefresh) {
+            // The real repair. Packets lost in flight are invisible to this end — the socket took
+            // them — so error accumulates in the client's reference frame and shows up as smear
+            // that a keyframe wipes all at once, which is the flash you can see arrive.
+            //
+            // Intra refresh spreads that repair out: a slice of the picture is coded from scratch
+            // in every frame, sweeping across it, so damage is cleaned continuously and there is no
+            // moment where everything is fixed at once because there is no moment where everything
+            // was broken. With it running, whole keyframes are only needed for somebody joining.
+            format.setInteger(MediaFormat.KEY_INTRA_REFRESH_PERIOD, 20);
+            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 6);
+        } else {
+            // Without it, a keyframe is the only repair there is, so it has to come often enough to
+            // keep a mistake short — and the flash is the price.
+            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
+        }
         // A desktop nobody is touching produces no frames at all, and a client that joined during
         // the quiet has nothing to decode. This makes the encoder re-emit the last picture instead,
         // which is the Android answer to a problem the Mac solves by asking for a still.
@@ -70,11 +111,10 @@ public final class Encoder {
         format.setInteger(MediaFormat.KEY_LATENCY, 0);
         format.setInteger(MediaFormat.KEY_PRIORITY, 0);
 
-        // Built into locals first and only published on success. A codec that fails to configure
-        // or start is still a hardware component that has been handed out, and if it is never
-        // assigned to the field there is nothing left holding it for anyone to release — the device
-        // has only a handful of encoders and a few failed starts exhaust them all.
-        MediaCodec built = MediaCodec.createEncoderByType(mime);
+        // Published to the fields only on success. A codec that fails to configure or start is
+        // still a hardware component that has been handed out, and if it is never assigned there is
+        // nothing left holding it for anyone to release — the device has only a handful of encoders
+        // and a few failed starts exhaust them all.
         Surface input = null;
         try {
             built.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
@@ -90,7 +130,8 @@ public final class Encoder {
         codec = built;
         surface = input;
         Ln.i("VIDEO", "Encoder = " + codec.getName() + " (" + mime + ")");
-        Ln.i("VIDEO", "Resolution = " + width + "x" + height + ", bitrate = " + bitrate / 1_000_000 + " Mb/s");
+        Ln.i("VIDEO", "Resolution = " + width + "x" + height + ", bitrate = " + bitrate / 1_000_000
+                + " Mb/s at 30, " + (intraRefresh ? "intra refresh" : "keyframes only"));
 
         drainThread = new Thread(this::drain, "miniMont-Encoder");
         drainThread.start();
