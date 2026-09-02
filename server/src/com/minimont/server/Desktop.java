@@ -29,6 +29,20 @@ public final class Desktop {
     private static final int NEW_TASK = 0x10000000;
     private static final int MULTIPLE_TASK = 0x08000000;
 
+    /**
+     * Where windows are allowed to open: the screen, less the taskbar and its own padding.
+     *
+     * Sent by the app, because the app is the thing that draws the taskbar and therefore the only
+     * thing that knows how tall it is. Zero until it says, and while it is zero nothing is clamped —
+     * guessing at an area and moving somebody's window into it would be worse than leaving it.
+     */
+    private static volatile int[] area = { 0, 0, 0, 0 };
+
+    public static void setArea(int left, int top, int right, int bottom) {
+        area = new int[] { left, top, right, bottom };
+        Ln.i("DESKTOP", "apps area " + left + "," + top + " - " + right + "," + bottom);
+    }
+
     private Desktop() {
     }
 
@@ -69,6 +83,7 @@ public final class Desktop {
         }
         if (found[1] == displayId) {
             Ln.i("DESKTOP", packageName + " is on display " + displayId + ", task " + found[0]);
+            fit(packageName);
             return true;
         }
 
@@ -77,12 +92,56 @@ public final class Desktop {
             int[] after = settle(packageName);
             if (after != null && after[1] == displayId) {
                 Ln.i("DESKTOP", "moved " + packageName + " to display " + displayId);
+                fit(packageName);
                 return true;
             }
         }
 
         Ln.i("DESKTOP", "could not move " + packageName + "; opening a new window here instead");
         return start(displayId, component, FREEFORM, false, NEW_TASK | MULTIPLE_TASK);
+    }
+
+    /**
+     * Put a window back inside the apps area.
+     *
+     * Never larger than the area and never outside it, and otherwise left exactly as it was. An app
+     * that opens small stays small; an app that opens bigger than the screen — which Chrome does —
+     * is brought back to something you can reach the edges of.
+     *
+     * This runs on every launch and is also a thing you can ask for by hand, because the window that
+     * needs it most is the one already open with its corners off the screen.
+     */
+    public static boolean fit(String packageName) {
+        int[] safe = area;
+        if (safe[2] <= safe[0] || safe[3] <= safe[1]) return false;
+
+        int[] found = Tasks.find(packageName);
+        if (found == null) return false;
+        int taskId = found[0];
+
+        int left = found[2], top = found[3], right = found[4], bottom = found[5];
+        int width = right - left;
+        int height = bottom - top;
+        if (width <= 0 || height <= 0) {
+            // Bounds unknown. Give it the area itself rather than guessing at a shape.
+            return Tasks.resize(taskId, safe[0], safe[1], safe[2], safe[3]);
+        }
+
+        width = Math.min(width, safe[2] - safe[0]);
+        height = Math.min(height, safe[3] - safe[1]);
+        left = clamp(left, safe[0], safe[2] - width);
+        top = clamp(top, safe[1], safe[3] - height);
+        if (left == found[2] && top == found[3]
+                && width == found[4] - found[2] && height == found[5] - found[3]) {
+            return true;
+        }
+        Ln.i("DESKTOP", "fitting " + packageName + " to " + left + "," + top
+                + " " + width + "x" + height);
+        return Tasks.resize(taskId, left, top, left + width, top + height);
+    }
+
+    private static int clamp(int value, int low, int high) {
+        return value < low ? low : (value > high ? high : value);
     }
 
     /**

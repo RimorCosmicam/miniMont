@@ -389,6 +389,18 @@ class DesktopController private constructor(private val context: Context) {
     /** Close an app, and mean it: the host force-stops it. */
     fun close(packageName: String) = send("close $packageName")
 
+    /**
+     * Where windows are allowed to open.
+     *
+     * Told to the host rather than worked out there, because the taskbar's height is a fact about
+     * something the app draws and the host has never seen.
+     */
+    fun setArea(left: Int, top: Int, right: Int, bottom: Int) =
+        send("area $left $top $right $bottom")
+
+    /** Bring a window back inside that area, for the one that is already off the screen. */
+    fun fit(packageName: String) = send("fit $packageName")
+
     /** The two system switches the quick card offers. Flipped by the host, which is allowed to. */
     fun wifi(on: Boolean) = send("wifi ${if (on) 1 else 0}")
 

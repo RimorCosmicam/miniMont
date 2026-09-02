@@ -86,7 +86,9 @@ class DesktopChrome(
                         onPickImage = onPickImage,
                         onGrantNotifications = onGrantNotifications,
                         onWifi = controller::wifi,
-                        onBatterySaver = controller::batterySaver
+                        onBatterySaver = controller::batterySaver,
+                        onFit = controller::fit,
+                        onArea = controller::setArea
                     )
                 }
             }

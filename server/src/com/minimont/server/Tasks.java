@@ -25,15 +25,74 @@ public final class Tasks {
     private Tasks() {
     }
 
-    /** The root task holding a package, as {rootTaskId, displayId}, or null if it has none. */
+    /**
+     * The root task holding a package, as {rootTaskId, displayId, left, top, right, bottom}.
+     *
+     * The bounds come back as zeroes when the framework will not give them up, which the caller has
+     * to treat as "unknown" rather than as "a window at the origin with no size".
+     */
     public static int[] find(String packageName) {
         for (Object task : rootTasks()) {
             if (!holds(task, packageName)) continue;
             Integer id = number(task, "taskId");
             Integer display = number(task, "displayId");
-            if (id != null && display != null) return new int[] { id, display };
+            if (id == null || display == null) continue;
+            int[] bounds = bounds(task);
+            return new int[] { id, display, bounds[0], bounds[1], bounds[2], bounds[3] };
         }
         return null;
+    }
+
+    /**
+     * Put a task somewhere, in display pixels.
+     *
+     * Only meaningful in freeform, which is the only mode miniMont launches into. The framework
+     * call first and the shell command behind it, the same order and for the same reason as moving
+     * one: a resize that happens once per action can afford a process, and one that happens per
+     * frame cannot.
+     */
+    public static boolean resize(int taskId, int left, int top, int right, int bottom) {
+        try {
+            Object service = service();
+            Method resize = null;
+            for (Method method : Class.forName("android.app.IActivityTaskManager").getMethods()) {
+                if (method.getName().equals("resizeTask")) {
+                    resize = method;
+                    break;
+                }
+            }
+            if (resize != null) {
+                Object[] arguments = new Object[resize.getParameterCount()];
+                arguments[0] = taskId;
+                arguments[1] = new android.graphics.Rect(left, top, right, bottom);
+                for (int i = 2; i < arguments.length; i++) arguments[i] = 0;
+                resize.invoke(service, arguments);
+                return true;
+            }
+        } catch (Throwable refused) {
+            Ln.i("TASKS", "framework would not resize " + taskId + ": " + refused);
+        }
+        return run("am task resize " + taskId + " " + left + " " + top + " " + right + " " + bottom);
+    }
+
+    /** A task's bounds, or four zeroes when the framework will not say. */
+    private static int[] bounds(Object task) {
+        try {
+            Object configuration = field(task, "configuration");
+            Object window = configuration == null ? null : field(configuration, "windowConfiguration");
+            if (window != null) {
+                Method get = window.getClass().getMethod("getBounds");
+                get.setAccessible(true);
+                Object rect = get.invoke(window);
+                if (rect instanceof android.graphics.Rect) {
+                    android.graphics.Rect bounds = (android.graphics.Rect) rect;
+                    return new int[] { bounds.left, bounds.top, bounds.right, bounds.bottom };
+                }
+            }
+        } catch (Throwable ignored) {
+            // Unknown, which the caller treats as unknown.
+        }
+        return new int[] { 0, 0, 0, 0 };
     }
 
     /**

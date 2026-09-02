@@ -39,6 +39,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Text
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
 import com.minimont.ui.mont.LocalMontScale
 import com.minimont.ui.mont.Mont
 import com.minimont.ui.mont.MontAccent
@@ -63,7 +66,14 @@ import java.util.Locale
  * still a target when it is the only thing down there.
  */
 private const val ICON = 30
-private const val PAD = 14
+
+/**
+ * The taskbar's padding, on every side, and the gap above it.
+ *
+ * Half what the dock used to carry. A dock floats and needs air around it to read as an object; a
+ * bar is the edge of the screen and needs only enough room not to crowd what is standing in it.
+ */
+private const val BAR = 7
 
 /** What the chrome can have open above the dock. At most one, because two is a window manager. */
 private enum class Panel { NONE, APPS, SETTINGS, ITEM, CALENDAR, NOTIFICATIONS, QUICK }
@@ -86,7 +96,9 @@ fun MontDesktop(
     onPickImage: () -> Unit,
     onGrantNotifications: () -> Unit,
     onWifi: (Boolean) -> Unit,
-    onBatterySaver: (Boolean) -> Unit
+    onBatterySaver: (Boolean) -> Unit,
+    onFit: (String) -> Unit,
+    onArea: (Int, Int, Int, Int) -> Unit
 ) {
     val context = LocalContext.current
     val store by DesktopStore.state.collectAsState()
@@ -94,6 +106,22 @@ fun MontDesktop(
     var selected by remember { mutableStateOf<DesktopApp?>(null) }
 
     val apps = remember { AppCatalog.apps(context) }
+
+    // The area windows are allowed to open in: the display, less the taskbar and its own padding on
+    // every other side. Measured rather than assumed — the bar's height is whatever is standing in
+    // it — and told to the host, which draws none of this and cannot work it out.
+    val density = LocalDensity.current
+    val configuration = LocalConfiguration.current
+    var bar by remember { mutableStateOf(0) }
+    LaunchedEffect(bar, configuration) {
+        if (bar == 0) return@LaunchedEffect
+        with(density) {
+            val inset = (BAR.dp * scaleOf(configuration)).roundToPx()
+            val width = configuration.screenWidthDp.dp.roundToPx()
+            val height = configuration.screenHeightDp.dp.roundToPx()
+            onArea(inset, inset, width - inset, height - bar - inset)
+        }
+    }
 
     // Pinned first, in the order they were pinned, then anything running that is not pinned. A dock
     // whose icons move as apps open is a dock you have to read before you can aim at it.
@@ -142,6 +170,10 @@ fun MontDesktop(
                         onClose(app.packageName)
                         panel = Panel.NONE
                     },
+                    onFit = {
+                        onFit(app.packageName)
+                        panel = Panel.NONE
+                    },
                     onDismiss = { panel = Panel.NONE }
                 )
             }
@@ -165,37 +197,29 @@ fun MontDesktop(
             Panel.NONE -> Unit
         }
 
-        Spacer(Modifier.height(14.dp * LocalMontScale.current))
+        Spacer(Modifier.height(BAR.dp * LocalMontScale.current))
 
-        Row(verticalAlignment = Alignment.Bottom) {
-            Dock(
-                apps = docked,
-                running = running,
-                onStart = { panel = if (panel == Panel.APPS) Panel.NONE else Panel.APPS },
-                // Launching an app that is already open brings its window forward, which is
-                // what clicking a dock icon means in every desktop anybody has used.
-                onOpen = { app ->
-                    panel = Panel.NONE
-                    onLaunch(app.component)
-                },
-                onHold = { app ->
-                    selected = app
-                    panel = Panel.ITEM
-                }
-            )
-            Spacer(Modifier.width(14.dp * LocalMontScale.current))
-            StatusCard(
-                onClock = { panel = if (panel == Panel.CALENDAR) Panel.NONE else Panel.CALENDAR },
-                onBattery = { panel = if (panel == Panel.QUICK) Panel.NONE else Panel.QUICK },
-                onNotifications = {
-                    panel = if (panel == Panel.NOTIFICATIONS) Panel.NONE else Panel.NOTIFICATIONS
-                }
-            )
-        }
-
-        // Half the padding it used to have: the dock sits closer to the edge it belongs to, and
-        // what is left reads as a margin rather than as a gap.
-        Spacer(Modifier.height((PAD / 2).dp * LocalMontScale.current))
+        Taskbar(
+            apps = docked,
+            running = running,
+            onStart = { panel = if (panel == Panel.APPS) Panel.NONE else Panel.APPS },
+            // Launching an app that is already open brings its window forward, which is what
+            // clicking a taskbar icon means in every desktop anybody has used.
+            onOpen = { app ->
+                panel = Panel.NONE
+                onLaunch(app.component)
+            },
+            onHold = { app ->
+                selected = app
+                panel = Panel.ITEM
+            },
+            onMeasured = { bar = it },
+            onClock = { panel = if (panel == Panel.CALENDAR) Panel.NONE else Panel.CALENDAR },
+            onBattery = { panel = if (panel == Panel.QUICK) Panel.NONE else Panel.QUICK },
+            onNotifications = {
+                panel = if (panel == Panel.NOTIFICATIONS) Panel.NONE else Panel.NOTIFICATIONS
+            }
+        )
     }
 }
 
@@ -300,15 +324,19 @@ private fun ItemCard(
     open: Boolean,
     onPin: () -> Unit,
     onClose: () -> Unit,
+    onFit: () -> Unit,
     onDismiss: () -> Unit
 ) {
     DesktopCard(width = 300, maxHeight = 220) {
         MontLabel(app.label.uppercase(), size = 16, alpha = MontWhite.PRIMARY)
         Spacer(Modifier.height(10.dp * LocalMontScale.current))
-        MontRow(label = if (pinned) "Unpin from the dock" else "Pin to the dock") {
+        MontRow(label = if (pinned) "Unpin from the taskbar" else "Pin to the taskbar") {
             onPin()
             onDismiss()
         }
+        // The window that needs this most is the one whose corners are already off the screen, and
+        // that is exactly the window you cannot drag back.
+        MontRow(label = "Fit to the screen", enabled = open) { onFit() }
         // Closing means the program is gone, not backgrounded. A window that reopens with the state
         // you closed it in is a window that did not close.
         MontRow(label = "Close", enabled = open) { onClose() }
@@ -317,31 +345,59 @@ private fun ItemCard(
     }
 }
 
+/**
+ * The taskbar.
+ *
+ * A full-width Mont surface along the bottom edge — no gap to the sides, no gap underneath, because
+ * a bar *is* the edge of the screen. That is the whole difference from the dock it replaces: a dock
+ * floats and has to be told apart from what is behind it, and a bar does not.
+ *
+ * What stands in it is arranged like a dock anyway. The mustard grid and the open applications sit
+ * in the middle, where they are equidistant from wherever the pointer happens to be, and the clock
+ * block holds the right end because that is where a clock has lived on every bar anybody has used
+ * and there is nothing to gain by being clever about it.
+ */
 @Composable
-private fun Dock(
+private fun Taskbar(
     apps: List<DesktopApp>,
     running: List<String>,
     onStart: () -> Unit,
     onOpen: (DesktopApp) -> Unit,
-    onHold: (DesktopApp) -> Unit
+    onHold: (DesktopApp) -> Unit,
+    onMeasured: (Int) -> Unit,
+    onClock: () -> Unit,
+    onBattery: () -> Unit,
+    onNotifications: () -> Unit
 ) {
     val scale = LocalMontScale.current
-    Row(
+    Box(
         Modifier
+            .fillMaxWidth()
             .background(MontSurface)
-            .padding(PAD.dp * scale),
-        horizontalArrangement = Arrangement.spacedBy(9.dp * scale),
-        verticalAlignment = Alignment.CenterVertically
+            .onSizeChanged { onMeasured(it.height) }
+            .padding(BAR.dp * scale)
     ) {
-        StartSquares(Modifier.size(ICON.dp * scale), onStart)
-        apps.forEach { app ->
-            DockItem(app, app.packageName in running, { onOpen(app) }, { onHold(app) })
+        Row(
+            Modifier.align(Alignment.Center),
+            horizontalArrangement = Arrangement.spacedBy(9.dp * scale),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            StartSquares(Modifier.size(ICON.dp * scale), onStart)
+            apps.forEach { app ->
+                DockItem(app, app.packageName in running, { onOpen(app) }, { onHold(app) })
+            }
         }
+        StatusBlock(
+            Modifier.align(Alignment.CenterEnd),
+            onClock = onClock,
+            onBattery = onBattery,
+            onNotifications = onNotifications
+        )
     }
 }
 
 /**
- * The first thing in the dock: a four by four grid of mustard squares.
+ * The first thing in the taskbar: a four by four grid of mustard squares.
  *
  * Sixteen squares rather than an icon, because Mont will not say a thing with a little picture when
  * a shape will do, and because this is the one control on the desktop that is not any application's
@@ -402,16 +458,19 @@ private fun DockItem(
 /**
  * The clock block: four facts in a two by two grid.
  *
- * Hours and minutes on the top row, and under each of them the number that belongs there — the
- * battery under the hours, what is waiting under the minutes. It reads as a grid rather than as a
- * clock with a caption, which is what it is: four separate things, three of which you glance at and
- * one of which you read.
+ * Hours and minutes on the top row with the colon between them, and under each the number that
+ * belongs there — the battery under the hours, what is waiting under the minutes. All four at one
+ * size, because they are four facts of equal standing and setting two of them smaller would be
+ * saying that the battery matters less than the hour, which is not true at four percent.
  *
- * The battery is green because it is the one number here that is about the phone rather than about
- * the time, and red under twenty, which is the only place red appears in miniMont.
+ * The colon stays. Two numbers side by side are two numbers; with the colon they are a time.
+ *
+ * The battery is green because it is the one number here about the phone rather than about the
+ * time, and red under twenty, which is the only place red appears in miniMont.
  */
 @Composable
-private fun StatusCard(
+private fun StatusBlock(
+    modifier: Modifier = Modifier,
     onClock: () -> Unit,
     onBattery: () -> Unit,
     onNotifications: () -> Unit
@@ -432,49 +491,46 @@ private fun StatusCard(
 
     val hours = remember(now) { SimpleDateFormat("HH", Locale.getDefault()).format(now) }
     val minutes = remember(now) { SimpleDateFormat("mm", Locale.getDefault()).format(now) }
+    val column = 26.dp * scale
+    val gutter = 9.dp * scale
 
-    Column(
-        Modifier
-            .background(MontSurface)
-            // As tall as the dock and as wide as it is tall, so the two stand together rather than
-            // each following a rule of its own.
-            .size((PAD * 2 + ICON).dp * scale)
-            .padding(horizontal = 5.dp * scale, vertical = 5.dp * scale),
-        verticalArrangement = Arrangement.Center
-    ) {
-        Row(Modifier.fillMaxWidth()) {
-            Cell(Modifier.weight(1f).combinedClickable(onClick = onClock)) {
-                MontLabel(hours, size = 16, alpha = MontWhite.PRIMARY)
+    Column(modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Cell(Modifier.width(column).combinedClickable(onClick = onClock)) {
+                MontLabel(hours, size = CLOCK, alpha = MontWhite.PRIMARY)
             }
-            Cell(Modifier.weight(1f).combinedClickable(onClick = onClock)) {
-                MontLabel(minutes, size = 16, alpha = MontWhite.PRIMARY)
+            Cell(Modifier.width(gutter)) {
+                MontLabel(":", size = CLOCK, alpha = MontWhite.DIM)
+            }
+            Cell(Modifier.width(column).combinedClickable(onClick = onClock)) {
+                MontLabel(minutes, size = CLOCK, alpha = MontWhite.PRIMARY)
             }
         }
-        Spacer(Modifier.height(2.dp * scale))
-        Row(Modifier.fillMaxWidth()) {
-            Cell(Modifier.weight(1f).combinedClickable(onClick = onBattery)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Cell(Modifier.width(column).combinedClickable(onClick = onBattery)) {
                 MontLabel(
                     "$battery",
-                    size = 10,
+                    size = CLOCK,
                     colour = if (battery in 1..19) MontAccent.LowBattery else MontAccent.Live,
                     alpha = 1f
                 )
             }
-            Cell(Modifier.weight(1f).combinedClickable(onClick = onNotifications)) {
+            Spacer(Modifier.width(gutter))
+            Cell(Modifier.width(column).combinedClickable(onClick = onNotifications)) {
                 // Nothing announces itself: at zero the count is not drawn faintly, and the block
                 // it lives in is not drawn either. The cell is simply empty.
                 if (notes.isNotEmpty()) {
                     Box(
                         Modifier
                             .background(Color.White)
-                            .padding(horizontal = 3.dp * scale, vertical = 1.dp * scale)
+                            .padding(horizontal = 3.dp * scale)
                     ) {
                         Text(
-                            "${notes.size}",
+                            if (notes.size > 99) "99" else "${notes.size}",
                             color = Color.Black,
                             fontFamily = Mont,
                             fontWeight = FontWeight.Black,
-                            fontSize = (9 * scale).sp,
+                            fontSize = (CLOCK * scale).sp,
                             maxLines = 1
                         )
                     }
@@ -483,6 +539,18 @@ private fun StatusCard(
         }
     }
 }
+
+/**
+ * The same scale the chrome is composed at, worked out from the same rule.
+ *
+ * Duplicated here rather than read from the composition local, because the area has to be computed
+ * from the display's own dimensions and not from whatever the surface it is drawn in happens to be.
+ */
+private fun scaleOf(configuration: android.content.res.Configuration): Float =
+    (minOf(configuration.screenWidthDp, configuration.screenHeightDp) / 560f).coerceIn(1f, 1.6f)
+
+/** One size for all four facts in the block. */
+private const val CLOCK = 15
 
 /** One square of the grid. Equal width, centred, so four different things line up as four. */
 @Composable

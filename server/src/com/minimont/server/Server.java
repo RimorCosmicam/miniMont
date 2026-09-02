@@ -266,6 +266,18 @@ public final class Server {
                 announce(true);
                 break;
             }
+            case "area": {
+                String[] parts = argument.split(" ");
+                if (parts.length == 4) {
+                    Desktop.setArea(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]),
+                            Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
+                }
+                break;
+            }
+            case "fit": {
+                if (!argument.isEmpty()) Desktop.fit(argument);
+                break;
+            }
             case "wifi": {
                 Desktop.wifi("1".equals(argument));
                 break;
