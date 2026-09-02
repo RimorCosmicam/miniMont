@@ -63,6 +63,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         controller = DesktopController.of(this)
         controller.phoneDisplayId = display?.displayId ?: Display.DEFAULT_DISPLAY
+        // Started with the app rather than with the desktop. It is what puts the dock on the
+        // display, and the display can already be there — the host is a separate process that
+        // outlives this window and may have been running before it opened.
+        MontService.start(this)
         setContent { Root(controller) }
     }
 
@@ -108,7 +112,7 @@ class MainActivity : ComponentActivity() {
                     ),
                     Requirement(
                         label = "Wireless debugging",
-                        detail = "Only the shell user may create the display DeX runs on. " +
+                        detail = "Only the shell user may create a display that will hold a window. " +
                             "Pairing once is how miniMont becomes it, on this phone alone.",
                         granted = paired,
                         action = "Pair"
@@ -143,7 +147,7 @@ class MainActivity : ComponentActivity() {
         val state by controller.state.collectAsState()
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             MontStage {
-                MontWordmark(tail = "Mate")
+                MontWordmark()
                 Spacer(Modifier.height(18.dp))
 
                 // Offered only while there is something to show them on. Changing the size rebuilds

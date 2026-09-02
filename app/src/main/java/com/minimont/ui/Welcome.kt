@@ -97,10 +97,10 @@ fun Welcome(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Column {
-                Text("air", color = Color.White, fontFamily = Mont, fontWeight = FontWeight.Thin, fontSize = 40.sp)
-                Text("Mate", color = Color.White, fontFamily = Mont, fontWeight = FontWeight.Black, fontSize = 40.sp)
+                Text("mini", color = Color.White, fontFamily = Mont, fontWeight = FontWeight.Thin, fontSize = 40.sp)
+                Text("Mont", color = Color.White, fontFamily = Mont, fontWeight = FontWeight.Black, fontSize = 40.sp)
             }
-            Detail("Samsung DeX on this phone, on the tablet you already own.")
+            Detail("A desktop of its own, on the screen you already own.")
             Spacer(Modifier.height(4.dp))
 
             requirements.forEachIndexed { index, item ->

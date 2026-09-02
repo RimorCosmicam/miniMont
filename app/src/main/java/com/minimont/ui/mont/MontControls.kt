@@ -31,12 +31,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** The wordmark: the lightest weight over the heaviest at one size. That contrast is the logo. */
+/**
+ * The wordmark: the lightest weight over the heaviest at one size. That contrast is the logo.
+ *
+ * Thin is the one weight in the language with a single job, and this is it — never below about
+ * 20px, and never anywhere else.
+ */
 @Composable
-fun MontWordmark(size: Int = 34, tail: String = "Mate") {
+fun MontWordmark(size: Int = 34, head: String = "mini", tail: String = "Mont") {
     val scaled = (size * LocalMontScale.current).sp
     Row {
-        Text("air", color = Color.White, fontFamily = Mont, fontWeight = FontWeight.Thin, fontSize = scaled)
+        Text(head, color = Color.White, fontFamily = Mont, fontWeight = FontWeight.Thin, fontSize = scaled)
         Text(tail, color = Color.White, fontFamily = Mont, fontWeight = FontWeight.Black, fontSize = scaled)
     }
 }

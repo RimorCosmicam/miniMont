@@ -16,9 +16,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -42,42 +39,49 @@ class MontService : Service() {
         super.onCreate()
         DesktopStore.load(this)
         controller = DesktopController.of(this)
-        startForeground(NOTIFICATION, notification())
+        startForeground(NOTIFICATION, notification(false))
 
         // Read the installed applications before anything asks for them. Loading and rasterising a
         // few hundred icons is not something to do inside the first composition of the dock.
         scope.launch(Dispatchers.IO) { AppCatalog.apps(this@MontService) }
 
-        scope.launch {
-            controller.state
-                .map { it.displayId }
-                .distinctUntilChanged()
-                .collect { displayId -> onDisplay(displayId) }
-        }
+        displays.registerDisplayListener(listener, null)
+        attach()
     }
+
+    private val displays by lazy { getSystemService(Context.DISPLAY_SERVICE) as DisplayManager }
 
     /**
      * The display arriving is the cue to put the dock on it.
      *
-     * A display created by another process takes a moment to become visible here, so this waits for
-     * it rather than deciding on the first look that there is nothing to draw on.
+     * Found by name rather than by the id the host printed. The host is a separate process that may
+     * have been started before this one, or restarted underneath it when a client asked for a
+     * different size — and in both cases an id parsed out of a log line we were not listening to is
+     * an id we do not have. The display calls itself miniMont; that is a better question to ask.
      */
-    private suspend fun onDisplay(displayId: Int?) {
-        chrome?.dismiss()
-        chrome = null
-        if (displayId == null) return
+    private val listener = object : DisplayManager.DisplayListener {
+        override fun onDisplayAdded(displayId: Int) = attach()
+        override fun onDisplayRemoved(displayId: Int) = attach()
+        override fun onDisplayChanged(displayId: Int) = Unit
+    }
 
-        val displays = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
-        repeat(20) {
-            val display = displays.getDisplay(displayId)
-            if (display != null) {
-                chrome = DesktopChrome(
-                    this, display, controller, ::pickWallpaper, ::grantNotifications
-                ).also { runCatching { it.show() } }
-                return
-            }
-            delay(100)
-        }
+    private var attachedTo: Int? = null
+
+    private fun attach() {
+        val display = displays.displays.firstOrNull { it.name == DISPLAY_NAME }
+        if (display?.displayId == attachedTo) return
+
+        chrome?.let { runCatching { it.dismiss() } }
+        chrome = null
+        attachedTo = display?.displayId
+        // Said rather than assumed: a notification claiming the desktop is running while there is
+        // no display is the kind of small lie that makes every other message untrustworthy.
+        getSystemService(NotificationManager::class.java)
+            .notify(NOTIFICATION, notification(display != null))
+        if (display == null) return
+
+        chrome = DesktopChrome(this, display, controller, ::pickWallpaper, ::grantNotifications)
+            .also { runCatching { it.show() } }
     }
 
     /**
@@ -104,6 +108,7 @@ class MontService : Service() {
     }
 
     override fun onDestroy() {
+        runCatching { displays.unregisterDisplayListener(listener) }
         chrome?.dismiss()
         chrome = null
         scope.cancel()
@@ -112,14 +117,17 @@ class MontService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private fun notification(): Notification {
+    private fun notification(running: Boolean): Notification {
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
             NotificationChannel(CHANNEL, "Desktop", NotificationManager.IMPORTANCE_LOW)
         )
         return Notification.Builder(this, CHANNEL)
             .setContentTitle("miniMont")
-            .setContentText("The desktop is running.")
+            .setContentText(
+                if (running) "The desktop is running."
+                else "Waiting for a display."
+            )
             .setSmallIcon(R.drawable.app_icon)
             .setOngoing(true)
             .build()
@@ -133,6 +141,9 @@ class MontService : Service() {
         fun stop(context: Context) {
             context.stopService(Intent(context, MontService::class.java))
         }
+
+        /** What the host calls the display it makes, and how the dock finds it again. */
+        const val DISPLAY_NAME = "miniMont"
 
         private const val CHANNEL = "desktop"
         private const val NOTIFICATION = 1
