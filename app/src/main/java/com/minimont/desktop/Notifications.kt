@@ -25,6 +25,8 @@ data class Note(
     val title: String,
     val text: String,
     val openable: Boolean,
+    /** False for the ones that are merely happening: there is nothing to dismiss. */
+    val dismissable: Boolean,
     /** The app's own accent, already darkened far enough to read white type on. */
     val colour: Int,
     val picture: ImageBitmap?,
@@ -42,11 +44,23 @@ object Notifications {
     private val _notes = MutableStateFlow<List<Note>>(emptyList())
     val notes = _notes.asStateFlow()
 
+    /**
+     * The ones that are not asking anything of you.
+     *
+     * A media player, a download, a VPN, a step counter — things that are *happening* rather than
+     * things to deal with. They cannot be dismissed and they never go to zero, so counting them
+     * with the rest makes the number on the taskbar meaningless. Kept, because sometimes you do
+     * want to see what is running, and kept apart, because most of the time you do not.
+     */
+    private val _ongoing = MutableStateFlow<List<Note>>(emptyList())
+    val ongoing = _ongoing.asStateFlow()
+
     @Volatile
     internal var service: MontNotificationListener? = null
 
-    internal fun set(notes: List<Note>) {
+    internal fun set(notes: List<Note>, ongoing: List<Note>) {
         _notes.value = notes
+        _ongoing.value = ongoing
     }
 
     /** Open the notification's own app, exactly as tapping it in the shade would. */
@@ -119,15 +133,12 @@ class MontNotificationListener : NotificationListenerService() {
         runCatching { activeNotifications?.firstOrNull { it.key == key } }.getOrNull()
 
     private fun refresh() {
-        val notes = runCatching {
-            activeNotifications.orEmpty()
-                // Ongoing notifications are not things you deal with, they are things that are
-                // happening — a download, a call, a player. Counting them makes the number never
-                // reach zero, which makes it worth nothing.
-                .filter { it.notification.flags and Notification.FLAG_ONGOING_EVENT == 0 }
-                .map { standing -> read(standing) }
-        }.getOrDefault(emptyList())
-        Notifications.set(notes)
+        val all = runCatching { activeNotifications.orEmpty().map { read(it) to it } }
+            .getOrDefault(emptyList())
+        val (ongoing, standing) = all.partition { (_, raw) ->
+            raw.notification.flags and Notification.FLAG_ONGOING_EVENT != 0
+        }
+        Notifications.set(standing.map { it.first }, ongoing.map { it.first })
     }
 
     private fun read(standing: StatusBarNotification): Note {
@@ -143,6 +154,7 @@ class MontNotificationListener : NotificationListenerService() {
             title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty(),
             text = text,
             openable = notification.contentIntent != null,
+            dismissable = notification.flags and Notification.FLAG_ONGOING_EVENT == 0,
             colour = readable(notification.color),
             picture = picture(standing),
             actions = notification.actions.orEmpty().mapIndexedNotNull { index, action ->

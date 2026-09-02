@@ -192,6 +192,8 @@ fun MontDesktop(
             Panel.APPS -> StartMenu(
                 apps = apps,
                 settings = store,
+                bar = with(density) { bar.toDp() }.value.toInt(),
+                area = store.thickness.padding,
                 onOpen = { app ->
                     panel = Panel.NONE
                     onLaunch(app.component)
@@ -370,27 +372,37 @@ private fun DesktopCard(
 private fun StartMenu(
     apps: List<DesktopApp>,
     settings: DesktopStore.State,
+    /** The taskbar's height and its padding, in dp: what is left is the fillable area. */
+    bar: Int,
+    area: Int,
     onOpen: (DesktopApp) -> Unit,
     onSettings: () -> Unit,
     onClose: () -> Unit
 ) {
     val scale = LocalMontScale.current
     val configuration = LocalConfiguration.current
-    // SuperFill lets the surface grow instead of scrolling inside a cap. The cap is still there
-    // when it is off, because a drawer that takes the screen to show nine applications is a drawer
-    // that hides the desktop for no reason.
-    val cap = if (settings.superFill) (configuration.screenHeightDp * 0.82f).toInt() else 420
 
-    DesktopCard(width = if (settings.drawer == DesktopStore.Drawer.GRID) 520 else 360, maxHeight = cap) {
+    // SuperFill is a different layout, not a taller one. A list that reaches the top of the screen
+    // is still one column of names with the whole display beside it doing nothing, so SuperFill
+    // takes the fillable area — everything above the taskbar — and puts a grid in it that works out
+    // its own columns from the width it was handed.
+    val filling = settings.superFill
+    val width = if (filling) configuration.screenWidthDp - 2 * area
+        else if (settings.drawer == DesktopStore.Drawer.GRID) 520 else 360
+    val cap = if (filling) configuration.screenHeightDp - bar - 3 * area else 420
+    val columns = if (filling) (width / CELL).coerceIn(3, 12) else settings.drawerColumns
+
+    DesktopCard(width = width, maxHeight = cap) {
         MontLabel("APPS", size = 16, alpha = MontWhite.PRIMARY)
         Spacer(Modifier.height(10.dp * scale))
 
-        when (settings.drawer) {
-            DesktopStore.Drawer.LIST -> apps.forEach { app ->
+        when {
+            filling || settings.drawer == DesktopStore.Drawer.GRID ->
+                Grid(apps, settings, columns, onOpen)
+
+            else -> apps.forEach { app ->
                 MontRow(label = app.label) { onOpen(app) }
             }
-
-            DesktopStore.Drawer.GRID -> Grid(apps, settings, onOpen)
         }
 
         Spacer(Modifier.height(10.dp * scale))
@@ -409,10 +421,11 @@ private fun StartMenu(
 private fun Grid(
     apps: List<DesktopApp>,
     settings: DesktopStore.State,
+    requestedColumns: Int,
     onOpen: (DesktopApp) -> Unit
 ) {
     val scale = LocalMontScale.current
-    val columns = settings.drawerColumns.coerceIn(3, 8)
+    val columns = requestedColumns.coerceIn(3, 12)
 
     if (settings.drawerPaged) {
         // Sideways, in pages: a page is as many rows as fit beside the columns, so a page is always
@@ -602,15 +615,25 @@ private fun DrawerSection(state: DesktopStore.State) {
         selected = modes.indexOf(state.drawer)
     ) { index -> DesktopStore.setDrawer(modes[index]) }
 
-    if (state.drawer == DesktopStore.Drawer.GRID) {
+    if (state.drawer == DesktopStore.Drawer.GRID || state.superFill) {
         Spacer(Modifier.height(12.dp * scale))
-        MontLabel("COLUMNS", size = 11, alpha = MontWhite.DETAIL)
+        MontLabel(
+            "COLUMNS",
+            size = 11,
+            alpha = if (state.superFill) MontWhite.DISABLED else MontWhite.DETAIL
+        )
         Spacer(Modifier.height(6.dp * scale))
         val columns = listOf(3, 4, 5, 6, 7, 8)
-        MontChips(
-            options = columns.map { "$it" },
-            selected = columns.indexOf(state.drawerColumns)
-        ) { index -> DesktopStore.setDrawerColumns(columns[index]) }
+        if (state.superFill) {
+            // Left visible and left alone. Hiding the setting would make it look as though it had
+            // gone; dimming it says it is still yours and something else is deciding it for now.
+            MontDetail("Worked out from the width while SuperFill is on.")
+        } else {
+            MontChips(
+                options = columns.map { "$it" },
+                selected = columns.indexOf(state.drawerColumns)
+            ) { index -> DesktopStore.setDrawerColumns(columns[index]) }
+        }
 
         Spacer(Modifier.height(10.dp * scale))
         SettingToggle("Names under icons", state.drawerTitles) { DesktopStore.setDrawerTitles(it) }
@@ -1277,15 +1300,41 @@ private fun CalendarCard(onClose: () -> Unit) {
 private fun NotificationsCard(onClose: () -> Unit) {
     val scale = LocalMontScale.current
     val notes by Notifications.notes.collectAsState()
-    val grouped = remember(notes) { notes.groupBy { it.packageName } }
+    val ongoing by Notifications.ongoing.collectAsState()
+    var showOngoing by remember { mutableStateOf(false) }
+    val shown = if (showOngoing) ongoing else notes
+    val grouped = remember(shown) { shown.groupBy { it.packageName } }
 
     // Capped like every other card and scrolling inside the cap, rather than running the height of
     // the display. What made it read as a sidebar was the height, not the side it was on.
     DesktopCard(width = 380, maxHeight = 420) {
-        MontLabel("NOTIFICATIONS", size = 16, alpha = MontWhite.PRIMARY)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            MontLabel(
+                if (showOngoing) "RUNNING" else "NOTIFICATIONS",
+                Modifier.weight(1f),
+                size = 16,
+                alpha = MontWhite.PRIMARY
+            )
+            // The count of things that are merely happening, in the corner. They cannot be
+            // dismissed and they never reach zero, so they are not in the list and not in the
+            // number on the taskbar — they are here, one press away, for when you do want to know
+            // what is running.
+            if (ongoing.isNotEmpty()) {
+                MontLabel(
+                    "${ongoing.size}",
+                    Modifier
+                        .combinedClickable { showOngoing = !showOngoing }
+                        .padding(start = 8.dp * scale),
+                    size = 13,
+                    alpha = if (showOngoing) MontWhite.ACTIVE else MontWhite.DIM
+                )
+            }
+        }
         Spacer(Modifier.height(10.dp * scale))
 
-        if (notes.isEmpty()) MontDetail("Nothing standing.")
+        if (shown.isEmpty()) {
+            MontDetail(if (showOngoing) "Nothing running." else "Nothing standing.")
+        }
 
         grouped.forEach { (_, group) ->
             // The app is named once, over its own run, rather than on every card belonging to it.
@@ -1299,7 +1348,11 @@ private fun NotificationsCard(onClose: () -> Unit) {
         }
 
         Spacer(Modifier.height(6.dp * scale))
-        if (notes.isNotEmpty()) MontRow(label = "Clear all") { Notifications.dismissAll() }
+        if (showOngoing) {
+            MontRow(label = "Back to notifications") { showOngoing = false }
+        } else if (notes.isNotEmpty()) {
+            MontRow(label = "Clear all") { Notifications.dismissAll() }
+        }
         MontRow(label = "Close", active = false) { onClose() }
     }
 }
@@ -1322,6 +1375,9 @@ private fun NoteText(text: String, modifier: Modifier = Modifier) {
     )
 }
 
+/** How wide one application is in a SuperFill grid, icon and name and the air around them. */
+private const val CELL = 84
+
 /** One notification: its own bar, and the white box under it holding what it said. */
 @Composable
 private fun NoteCard(note: Note) {
@@ -1342,14 +1398,18 @@ private fun NoteCard(note: Note) {
                 size = NOTE_TITLE,
                 alpha = MontWhite.ACTIVE
             )
-            MontLabel(
-                "X",
-                Modifier
-                    .combinedClickable { Notifications.dismiss(note.key) }
-                    .padding(start = 8.dp * scale),
-                size = NOTE_TITLE,
-                alpha = MontWhite.ACTIVE
-            )
+            // Nothing to close on something that is merely happening: the X is not drawn faint,
+            // it is not drawn.
+            if (note.dismissable) {
+                MontLabel(
+                    "X",
+                    Modifier
+                        .combinedClickable { Notifications.dismiss(note.key) }
+                        .padding(start = 8.dp * scale),
+                    size = NOTE_TITLE,
+                    alpha = MontWhite.ACTIVE
+                )
+            }
         }
 
         // Touching the bar above it. No gap, no rounding, no shadow — one object in two halves.

@@ -45,9 +45,9 @@ object DesktopStore {
         val time: Int,
         val date: Int
     ) {
-        THIN("Thin", 26, 5, 15, 10),
-        REGULAR("Regular", 30, 7, 16, 10),
-        THICK("Thick", 34, 9, 18, 11)
+        THIN("Thin", 22, 4, 14, 9),
+        REGULAR("Regular", 26, 5, 15, 10),
+        LARGE("Large", 30, 7, 16, 10)
     }
 
     data class State(
@@ -67,6 +67,14 @@ object DesktopStore {
          * Off, a Mont surface is capped and scrolls inside the cap. On, it grows instead — which is
          * the right answer when you are looking for one application among two hundred and the wrong
          * one when you keep six pinned and know where they are.
+         */
+        /**
+         * Fill the whole area above the taskbar with a grid of every application.
+         *
+         * Not a taller list — a list that reaches the top of the screen is still one column of
+         * names with the rest of the display beside it doing nothing. SuperFill is a different
+         * layout: the grid takes the fillable area and works out its own columns from the width it
+         * was given, which is why the column setting goes quiet while it is on.
          */
         val superFill: Boolean = false,
         val thickness: Thickness = Thickness.REGULAR
