@@ -17,15 +17,15 @@ object DesktopStore {
 
     /** The backdrops that need no file: drawn, not loaded. */
     enum class Backdrop(val label: String) {
+        MUSTARD("Mustard"),
         BLACK("Black"),
-        MUSTARD("Mustard stripes"),
-        LIVE("Green stripes"),
-        DANGER("Red stripes"),
+        LIVE("Green"),
+        DANGER("Red"),
         IMAGE("A picture")
     }
 
     data class State(
-        val backdrop: Backdrop = Backdrop.BLACK,
+        val backdrop: Backdrop = Backdrop.MUSTARD,
         /** The chosen picture, if there is one. Held even while another backdrop is showing. */
         val image: String? = null,
         val pinned: List<String> = emptyList()
@@ -41,8 +41,8 @@ object DesktopStore {
         preferences = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         _state.value = State(
             backdrop = runCatching {
-                Backdrop.valueOf(preferences.getString(BACKDROP, null) ?: Backdrop.BLACK.name)
-            }.getOrDefault(Backdrop.BLACK),
+                Backdrop.valueOf(preferences.getString(BACKDROP, null) ?: Backdrop.MUSTARD.name)
+            }.getOrDefault(Backdrop.MUSTARD),
             image = preferences.getString(IMAGE, null),
             pinned = preferences.getString(PINNED, "").orEmpty()
                 .split(',').filter { it.isNotBlank() }

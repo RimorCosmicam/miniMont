@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -14,12 +15,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import com.minimont.ui.mont.DiagonalStripes
 import com.minimont.ui.mont.MontAccent
 
 /**
@@ -48,11 +49,15 @@ class DesktopActivity : ComponentActivity() {
 /**
  * The wallpaper.
  *
- * Black is the default and the only one the language really wants: a desktop is entirely a thing
- * you have to read, and Mont keeps its one piece of ornament away from anything you read. The
- * stripes are offered because somebody may choose them for their own screen, which is a different
- * matter from miniMont putting them there — and they are still, so they do not move behind a
- * window somebody is working in.
+ * A radial wash, mustard in the middle and black at the corners, with the mustard holding most of
+ * the radius so the fall-off happens late and gently. It replaced the diagonal stripes here for a
+ * reason worth writing down: the stripes were not broken, they were *legible*. A high-contrast
+ * pattern shows every dropped fragment as a torn edge, and a desktop background's job is to be the
+ * thing you are not looking at. A soft gradient hides the same loss because there are no edges in
+ * it to tear.
+ *
+ * The stripes keep the job Mont actually gives them — a curtain over a moment, not a floor under
+ * the work.
  */
 @Composable
 fun Backdrop(state: DesktopStore.State, modifier: Modifier = Modifier) {
@@ -61,14 +66,9 @@ fun Backdrop(state: DesktopStore.State, modifier: Modifier = Modifier) {
         when (state.backdrop) {
             DesktopStore.Backdrop.BLACK -> Unit
 
-            DesktopStore.Backdrop.MUSTARD ->
-                DiagonalStripes(0f, MontAccent.Mustard, Color.Black, modifier = Modifier.fillMaxSize())
-
-            DesktopStore.Backdrop.LIVE ->
-                DiagonalStripes(0f, MontAccent.Live, Color.Black, modifier = Modifier.fillMaxSize())
-
-            DesktopStore.Backdrop.DANGER ->
-                DiagonalStripes(0f, MontAccent.Danger, Color.Black, modifier = Modifier.fillMaxSize())
+            DesktopStore.Backdrop.MUSTARD -> Glow(MontAccent.Mustard)
+            DesktopStore.Backdrop.LIVE -> Glow(MontAccent.Live)
+            DesktopStore.Backdrop.DANGER -> Glow(MontAccent.Danger)
 
             DesktopStore.Backdrop.IMAGE -> {
                 val picture = remember(state.image) {
@@ -90,5 +90,28 @@ fun Backdrop(state: DesktopStore.State, modifier: Modifier = Modifier) {
                 }
             }
         }
+    }
+}
+
+/**
+ * One colour, from the middle outwards.
+ *
+ * The stops are deliberately lopsided. An even black-to-colour ramp reads as a vignette on a dark
+ * screen; holding the colour flat across the first half and letting it fall away after reads as a
+ * light that is on, which is what a desktop wants behind it.
+ */
+@Composable
+private fun Glow(colour: Color) {
+    Canvas(Modifier.fillMaxSize()) {
+        drawRect(
+            Brush.radialGradient(
+                0.00f to colour,
+                0.45f to colour,
+                0.72f to colour.copy(alpha = .55f),
+                1.00f to Color.Black,
+                center = center,
+                radius = size.maxDimension * .78f
+            )
+        )
     }
 }

@@ -40,7 +40,12 @@ public final class Transport implements Runnable {
         this.listener = listener;
         channel = DatagramChannel.open();
         channel.setOption(StandardSocketOptions.SO_REUSEADDR, true);
-        channel.setOption(StandardSocketOptions.SO_SNDBUF, 256 * 1024);
+        // 256KB held about a seventh of a second of video, and a single keyframe can be most of
+        // that on its own — so one keyframe filled the queue, the fragments behind it were thrown
+        // away, and the picture stayed broken until the next keyframe a whole second later. Ask for
+        // far more; the kernel will cap it wherever it likes and anything it grants is a burst that
+        // no longer costs a frame.
+        channel.setOption(StandardSocketOptions.SO_SNDBUF, 4 * 1024 * 1024);
         channel.bind(new InetSocketAddress(Protocol.PORT));
         channel.configureBlocking(false);
         selector = Selector.open();
@@ -122,9 +127,13 @@ public final class Transport implements Runnable {
     /**
      * Fragment one access unit across the wire.
      *
-     * The socket is non-blocking, so a full send buffer returns zero rather than waiting. When that
-     * happens the rest of this access unit is abandoned: a frame delivered late is worth less than
-     * the frame behind it, and the client's next keyframe repairs the gap.
+     * The socket is non-blocking, so a full send buffer returns zero rather than waiting. A full
+     * buffer is usually momentary — the radio is busy for a millisecond — so the fragment is
+     * offered again a few times before it is given up on. Abandoning it immediately was throwing
+     * away whole frames for a hiccup that had already passed by the time the next one arrived.
+     *
+     * Past that, the rest of the access unit still goes: a frame delivered late is worth less than
+     * the frame behind it, and the keyframe that follows repairs the gap.
      */
     public void sendVideo(byte[] accessUnit, int length, long sessionId, long frameId,
                           long captureNanos, boolean keyframe, boolean hevc) {
@@ -142,7 +151,18 @@ public final class Transport implements Runnable {
                     index, count, flags, accessUnit, start, size);
             fragmentBuffer.limit(total).position(0);
             try {
-                if (channel.send(fragmentBuffer, target) == 0) {
+                boolean sent = false;
+                for (int attempt = 0; attempt < 8 && !sent; attempt++) {
+                    if (channel.send(fragmentBuffer, target) != 0) {
+                        sent = true;
+                    } else {
+                        // A quarter of a millisecond, eight times: two milliseconds at the very
+                        // worst, which is inside one frame at sixty and cheaper than losing it.
+                        java.util.concurrent.locks.LockSupport.parkNanos(250_000L);
+                        fragmentBuffer.position(0);
+                    }
+                }
+                if (!sent) {
                     Diagnostics.droppedNetwork++;
                     return;
                 }

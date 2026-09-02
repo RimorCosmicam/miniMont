@@ -345,6 +345,7 @@ public final class Server {
     /** Status once a second, which is the only thing the client can describe a stopped host from. */
     private void statusLoop() {
         long previous = 0;
+        long previousDropped = 0;
         int tick = 0;
         while (true) {
             try {
@@ -353,6 +354,16 @@ public final class Server {
                 return;
             }
             transport.sendStatus(display != null, false, width, height, Diagnostics.encoded);
+
+            // Anything dropped means the client is holding a frame with a hole in it, and it will
+            // keep holding it until a keyframe arrives. Waiting for the scheduled one leaves the
+            // mess on screen for up to a second; asking now costs one large frame and ends it.
+            long dropped = Diagnostics.droppedNetwork;
+            if (dropped > previousDropped) {
+                previousDropped = dropped;
+                Encoder current = encoder;
+                if (current != null) current.requestKeyframe();
+            }
             // The dock's own heartbeat. Nothing is sent unless the answer changed.
             session.execute(() -> announce(false));
             // Every fifth tick, in frames per second rather than a running total: "no picture" has

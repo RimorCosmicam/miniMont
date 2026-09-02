@@ -52,10 +52,17 @@ public final class Encoder {
         // Scaled with the picture rather than fixed: twelve megabits looks fine at 720p and starves
         // 1080p, which has more than twice the pixels to spend it on.
         long pixels = (long) width * height;
-        int bitrate = (int) Math.min(40_000_000L, Math.max(12_000_000L, pixels * 60 * 18 / 100));
+        // Halved, and floored much lower. The old figure — about 0.18 bits per pixel per second —
+        // is a video number, and this is a desktop: mostly still, mostly flat colour, and the parts
+        // that move are a cursor and a window. What it was buying was not detail, it was a send
+        // queue that could not keep up, and a fragment dropped from a frame is worse than a frame
+        // encoded slightly softer.
+        int bitrate = (int) Math.min(24_000_000L, Math.max(6_000_000L, pixels * 60 * 9 / 100));
         format.setInteger(MediaFormat.KEY_BIT_RATE, bitrate);
         format.setInteger(MediaFormat.KEY_FRAME_RATE, 60);
-        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2);
+        // One second rather than two. A lost fragment corrupts everything until the next keyframe,
+        // so this is not a quality setting, it is how long a mistake stays on screen.
+        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
         // A desktop nobody is touching produces no frames at all, and a client that joined during
         // the quiet has nothing to decode. This makes the encoder re-emit the last picture instead,
         // which is the Android answer to a problem the Mac solves by asking for a still.
