@@ -41,7 +41,31 @@ or not at all. `dumpflags` on AirMate's server already dumps every
 **If it cannot be removed:** the design changes rather than the code fighting it.
 Say so early.
 
-## 3. A pointer that other apps obey
+## 3. A pointer that other apps obey — ANSWERED
+
+> **Measured on a Z Flip 7, Android 16, 2 September 2026. Injection works, and the
+> acceptance test passed.**
+>
+> `InputManagerGlobal.getInstance()` is reachable from the shell uid, and
+> `injectInputEvent` takes `MotionEvent`s carrying `SOURCE_MOUSE`, `TOOL_TYPE_MOUSE`,
+> a real button state and `setDisplayId` — with a **hover stream** while nothing is
+> pressed. That last part is what miniDex was missing.
+>
+> Two things were driven, both by injected pointer alone:
+>
+> - the four-by-four mustard grid on miniMont's own dock — the chrome window grew from
+>   `Rect(0, 929 – 1808, 1088)` to `Rect(0, 257 – 1808, 1088)`, which is the start menu
+>   opening;
+> - a control **inside somebody else's window** — a click in the Clock's freeform
+>   window took focus from `ClockPackage` to `AlarmEditActivity`. The app answered the
+>   pointer the way it would answer a mouse.
+>
+> No UHID device, no `input` command, no device association. Candidate B in
+> [INPUT.md](INPUT.md) is what ships; A and C are not needed.
+
+The original question, kept because the reasoning is still what the code rests on:
+
+## 3 (as originally written). A pointer that other apps obey
 
 **Why it matters:** it is the second gate on the product, and unlike most of this
 list it is not a guess — it is a known failure. In miniDex the cursor moves over DeX

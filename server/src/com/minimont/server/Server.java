@@ -56,6 +56,7 @@ public final class Server {
     private FrameRepeater repeater;
     private MontDisplay display;
     private Input input;
+    private Pointer pointer;
 
     private int width;
     private int height;
@@ -256,6 +257,37 @@ public final class Server {
                 announce(true);
                 break;
             }
+            // The pointer verbs are short because they are the only ones sent at the rate a finger
+            // moves. Everything else on this stream happens once per human decision.
+            case "m": {
+                if (pointer == null) return;
+                String[] parts = argument.split(" ");
+                pointer.move(Float.parseFloat(parts[0]), Float.parseFloat(parts[1]));
+                break;
+            }
+            case "b": {
+                if (pointer == null) return;
+                String[] parts = argument.split(" ");
+                pointer.button(Integer.parseInt(parts[0]), "1".equals(parts[1]));
+                break;
+            }
+            case "w": {
+                if (pointer == null) return;
+                String[] parts = argument.split(" ");
+                pointer.scroll(Float.parseFloat(parts[0]), Float.parseFloat(parts[1]));
+                break;
+            }
+            case "k": {
+                if (pointer == null) return;
+                String[] parts = argument.split(" ");
+                pointer.tap(Integer.parseInt(parts[0]),
+                        parts.length > 1 ? Integer.parseInt(parts[1]) : 0);
+                break;
+            }
+            case "t": {
+                if (pointer != null && !argument.isEmpty()) pointer.type(argument);
+                break;
+            }
             default:
                 Ln.i("HOST", "unknown command: " + line);
         }
@@ -342,6 +374,10 @@ public final class Server {
             display = MontDisplay.create(NAME, width, height, dpi, target, flagOverride, decorations);
             if (freeform) display.enableFreeform();
             input = new Input(display.id(), width, height);
+            pointer = new Pointer(display.id(), width, height);
+            if (!pointer.ready()) {
+                Ln.i("HOST", "POINTER FAILED — the cover screen will not be able to drive this");
+            }
             everStarted = true;
             // The backdrop goes on immediately. An empty trusted display is a black rectangle that
             // gives no sign of whether any of this worked, and the wallpaper arriving is the first
@@ -363,6 +399,7 @@ public final class Server {
         // Torn down in the order things depend on each other: the display draws into the encoder's
         // surface, so the display goes first or the encoder is released underneath a live producer.
         if (input != null) { input.close(); input = null; }
+        pointer = null;
         if (display != null) { display.release(); display = null; }
         if (repeater != null) { repeater.close(); repeater = null; }
         if (encoder != null) { encoder.close(); encoder = null; }

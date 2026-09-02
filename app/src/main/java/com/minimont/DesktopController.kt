@@ -6,6 +6,8 @@ import com.minimont.adb.AdbClient
 import com.minimont.adb.AdbMdns
 import io.github.muntashirakon.adb.AdbStream
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,6 +47,8 @@ data class DesktopState(
     val connectPort: Int? = null,
     /** The size actually running, as the host reported it — never the one merely asked for. */
     val size: Pair<Int, Int>? = null,
+    /** The AirMate client receiving the picture, once one has said hello. */
+    val client: String? = null,
     /** The client's own panel, once it has said. */
     val panel: Pair<Int, Int>? = null,
     /** The largest frame the client's decoder will accept, once it has said. */
@@ -265,6 +269,13 @@ class DesktopController private constructor(private val context: Context) {
                             _state.update { it.copy(panel = panel, ceiling = ceiling) }
                         }
 
+                        // The tablet arriving is what turns onboarding's second phase into its
+                        // third, so it is watched for rather than asked about.
+                        line.contains("Client paired:") -> {
+                            val address = line.substringAfter("Client paired:").trim()
+                            _state.update { it.copy(client = address) }
+                        }
+
                         line.contains("BACKDROP FAILED") -> _state.update {
                             it.copy(
                                 stage = DesktopStage.FAILED,
@@ -302,17 +313,49 @@ class DesktopController private constructor(private val context: Context) {
      * answer to the question of who may speak on it.
      */
     private fun send(line: String) {
-        val open = stream ?: return
+        outgoing.trySend(line)
+    }
+
+    /**
+     * One writer, one queue.
+     *
+     * Launching a coroutine per line was fine for four verbs a human presses. The pointer sends at
+     * the rate a finger moves, and a coroutine per motion event is both wasteful and unordered —
+     * two moves that overtake each other put the cursor somewhere neither of them meant.
+     *
+     * The queue drops rather than blocks. A pointer delta that could not be written for a whole
+     * second is a delta whose moment has passed, and catching up on stale movement afterwards is
+     * worse than having missed it.
+     */
+    private val outgoing = Channel<String>(capacity = 256, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+    init {
         scope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) {
+            for (line in outgoing) {
+                val open = stream ?: continue
+                runCatching {
                     val out = open.openOutputStream()
                     out.write((line + "\n").toByteArray())
                     out.flush()
-                }
-            }.onFailure { Log.e(TAG, "could not send: $line", it) }
+                }.onFailure { Log.e(TAG, "could not send: $line", it) }
+            }
         }
     }
+
+    /** Relative pointer movement, as the touchpad produces it. */
+    fun move(dx: Float, dy: Float) = send("m ${dx.round()} ${dy.round()}")
+
+    /** A mouse button, held for exactly as long as the finger is. 1 left, 2 right, 3 middle. */
+    fun button(button: Int, down: Boolean) = send("b $button ${if (down) 1 else 0}")
+
+    fun scroll(horizontal: Float, vertical: Float) =
+        send("w ${horizontal.round()} ${vertical.round()}")
+
+    fun key(keyCode: Int, metaState: Int = 0) = send("k $keyCode $metaState")
+
+    fun type(text: String) = send("t $text")
+
+    private fun Float.round() = String.format(java.util.Locale.US, "%.2f", this)
 
     /** Open an app on the desktop, as a window. */
     fun launch(component: String) = send("launch $component")
@@ -338,6 +381,7 @@ class DesktopController private constructor(private val context: Context) {
                 stage = DesktopStage.IDLE,
                 message = "Desktop stopped",
                 displayId = null,
+                client = null,
                 openApps = emptyList()
             )
         }

@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.minimont.cover.AirMateSetup
+import com.minimont.cover.CoverScreen
 import com.minimont.ui.PairingOverlay
 import com.minimont.ui.PairingStrip
 import com.minimont.ui.Requirement
@@ -42,7 +45,6 @@ import com.minimont.ui.mont.DiagonalStripes
 import com.minimont.ui.mont.MONT_SURFACE_ALPHA
 import com.minimont.ui.mont.MontAccent
 import com.minimont.ui.mont.MontDetail
-import com.minimont.ui.mont.MontChips
 import com.minimont.ui.mont.MontLabel
 import com.minimont.ui.mont.MontRow
 import com.minimont.ui.mont.MontWhite
@@ -105,6 +107,14 @@ class MainActivity : ComponentActivity() {
 
         val state by controller.state.collectAsState()
 
+        // The three phases, in the order the onboarding actually has: what miniMont needs, then
+        // somewhere to put the picture, then the thing itself. The second phase is usually skipped
+        // — the host is started as soon as the shell connection exists, during the first phase, so
+        // by the time the permissions are done the tablet has normally already said hello.
+        LaunchedEffect(paired, accessibility) {
+            if (paired && accessibility && !state.running && !state.busy) controller.start()
+        }
+
         if (!welcomed || !accessibility || !paired) {
             Welcome(
                 requirements = listOf(
@@ -136,17 +146,27 @@ class MainActivity : ComponentActivity() {
                     welcomed = true
                 }
             )
+        } else if (state.client == null) {
+            AirMateSetup(controller)
+        } else if (state.running) {
+            // Once the desktop is up, this screen stops being about the desktop and becomes the
+            // thing you drive it with. Nobody looks at the cover display from here on; they touch
+            // it while looking at the other one.
+            CoverScreen(controller) {
+                controller.stop()
+                MontService.stop(this@MainActivity)
+            }
         } else {
             DesktopCard(controller)
         }
     }
 
     /**
-     * The desktop, as two facts, on a card over stripes.
+     * Before there is a desktop: one card over stripes, and one row on it.
      *
-     * One row that starts or stops it, and the sizes it can run at. Nothing else: the display id,
-     * the frame counters and the host's own log are all things the machine knows and nobody asked
-     * to see, and a card that lists them is a card you have to read rather than use.
+     * Nothing else. The display id, the frame counters and the host's own log are all things the
+     * machine knows and nobody asked to see, and the resolutions have gone where they belong —
+     * onto the AirMate page, which only means anything once something is being sent.
      *
      * The stripes behind it are not decoration and are not here because the screen looked empty.
      * They are the one place in Mont where colour carries a state across a whole surface, and this
@@ -183,28 +203,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 MontWordmark()
                 Spacer(Modifier.height(18.dp))
-
-                // Offered only while there is something to show them on. Changing the size rebuilds
-                // the display, and its whole effect is on a screen that is not there yet.
-                if (state.running) {
-                    val choices = state.choices
-                    MontChips(
-                        options = choices.map { "${it.first} × ${it.second}" },
-                        selected = choices.indexOf(state.size)
-                    ) { index ->
-                        val (width, height) = choices[index]
-                        controller.setResolution(width, height)
-                    }
-                    Spacer(Modifier.height(6.dp))
-                    MontRow(label = "Stop the desktop") {
-                        controller.stop()
-                        MontService.stop(this@MainActivity)
-                    }
-                } else {
-                    MontRow(label = "Start the desktop", enabled = !state.busy) {
-                        controller.start()
-                    }
-                }
+                MontRow(label = "Start the desktop", enabled = !state.busy) { controller.start() }
 
                 // One line, and only when it is carrying something the user has to act on.
                 if (state.stage == DesktopStage.FAILED) {

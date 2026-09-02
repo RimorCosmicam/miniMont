@@ -71,15 +71,16 @@ invites One UI's desktop onto a display. If activities will not launch onto a
 display with no system decorations, or will not go freeform there, miniMont is a
 different program. [DISPLAY.md](docs/DISPLAY.md)
 
-**A pointer other apps obey.** This one is not a guess — it is where miniDex stops.
-Its cursor moves over DeX and cannot open anything in it, because a HID mouse belongs
-to the system rather than to a display, so what lands is a drawn cursor and a
-synthesised tap that a launcher icon does not answer. miniMont's cursor has to be a
-real one on a real display, and there are three ways it might be.
-[INPUT.md](docs/INPUT.md)
+**A pointer other apps obey.** Where miniDex stops: its cursor moves over DeX and
+cannot open anything in it, because a HID mouse belongs to the system rather than to a
+display, so what lands is a drawn cursor and a synthesised tap that a launcher icon
+does not answer.
 
-Everything else in these documents is design, and design can be changed. These two
-are the ground it stands on.
+Both came back **yes**, on a Z Flip 7 running Android 16. The display holds windows in
+freeform with One UI putting nothing on it, and an injected mouse — `SOURCE_MOUSE`,
+real button state, display id, and a hover stream while nothing is pressed — opens
+miniMont's own start menu and clicks controls inside other apps' windows.
+[MEASUREMENTS.md](docs/MEASUREMENTS.md) has what was run and what came back.
 
 ## How it is put together
 

@@ -75,8 +75,10 @@ way, with no injection anywhere in the path. The hard part is only the events
 destined for somebody else's window — which is precisely where miniDex fails, and
 precisely what has to be solved before anything else is built.
 
-Four candidate mechanisms, best first. Each is an experiment in
-[MEASUREMENTS.md](MEASUREMENTS.md), and one of them has to come back yes.
+Four candidate mechanisms, best first. Each was an experiment in
+[MEASUREMENTS.md](MEASUREMENTS.md), and **B is the one that came back yes** — measured
+on the phone, opening miniMont's own start menu and then a control inside the Clock's
+window. It is what `server/Pointer.java` does, and A and C were never needed.
 
 **A. A virtual mouse bound to the display.** Android 14 added `VirtualDeviceManager`
 with `VirtualMouse`, `VirtualKeyboard` and `VirtualTouchscreen`, and a virtual mouse
