@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -52,6 +54,7 @@ import com.minimont.ui.mont.LocalMontScale
 import com.minimont.ui.mont.Mont
 import com.minimont.ui.mont.MontAccent
 import com.minimont.ui.mont.MontCard
+import com.minimont.ui.mont.MontChips
 import com.minimont.ui.mont.MontDetail
 import com.minimont.ui.mont.MontLabel
 import com.minimont.ui.mont.MontRow
@@ -72,15 +75,13 @@ import java.util.Locale
  * the screen; the whole point of it is to be found without being looked at, and a smaller target is
  * still a target when it is the only thing down there.
  */
-private const val ICON = 30
-
 /**
- * The taskbar's padding, on every side, and the gap above it.
+ * The gap between whatever is open and the bar under it.
  *
- * Half what the dock used to carry. A dock floats and needs air around it to read as an object; a
- * bar is the edge of the screen and needs only enough room not to crowd what is standing in it.
+ * Follows the bar's own padding, so the three bands — screen edge, bar, card — are evenly spaced
+ * rather than being two decisions that happen to sit near each other.
  */
-private const val BAR = 7
+private val DesktopStore.Thickness.gap: Int get() = padding
 
 /** What the chrome can have open above the dock. At most one, because two is a window manager. */
 private enum class Panel {
@@ -155,10 +156,10 @@ fun MontDesktop(
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
     var bar by remember { mutableStateOf(0) }
-    LaunchedEffect(bar, configuration) {
+    LaunchedEffect(bar, configuration, store.thickness) {
         if (bar == 0) return@LaunchedEffect
         with(density) {
-            val inset = (BAR.dp * scaleOf(configuration)).roundToPx()
+            val inset = (store.thickness.padding.dp * scaleOf(configuration)).roundToPx()
             val width = configuration.screenWidthDp.dp.roundToPx()
             val height = configuration.screenHeightDp.dp.roundToPx()
             onArea(inset, inset, width - inset, height - bar - inset)
@@ -180,6 +181,7 @@ fun MontDesktop(
         when (panel) {
             Panel.APPS -> StartMenu(
                 apps = apps,
+                settings = store,
                 onOpen = { app ->
                     panel = Panel.NONE
                     onLaunch(app.component)
@@ -291,11 +293,12 @@ fun MontDesktop(
             Panel.NONE -> Unit
         }
 
-        Spacer(Modifier.height(BAR.dp * LocalMontScale.current))
+        Spacer(Modifier.height(store.thickness.gap.dp * LocalMontScale.current))
 
         Taskbar(
             apps = docked,
             running = running,
+            thickness = store.thickness,
             onStart = { panel = if (panel == Panel.APPS) Panel.NONE else Panel.APPS },
             // Launching an app that is already open brings its window forward, which is what
             // clicking a taskbar icon means in every desktop anybody has used.
@@ -345,31 +348,151 @@ private fun DesktopCard(
     )
 }
 
+/**
+ * The app drawer: every application, as a list or as a grid.
+ *
+ * A list is a column of names, which is the fastest thing to read and the slowest thing to aim at.
+ * A grid is a field of icons, which is the opposite. Neither is right for everybody, so it is a
+ * setting rather than an argument.
+ */
 @Composable
 private fun StartMenu(
     apps: List<DesktopApp>,
+    settings: DesktopStore.State,
     onOpen: (DesktopApp) -> Unit,
     onSettings: () -> Unit,
     onClose: () -> Unit
 ) {
-    DesktopCard {
+    val scale = LocalMontScale.current
+    val configuration = LocalConfiguration.current
+    // SuperFill lets the surface grow instead of scrolling inside a cap. The cap is still there
+    // when it is off, because a drawer that takes the screen to show nine applications is a drawer
+    // that hides the desktop for no reason.
+    val cap = if (settings.superFill) (configuration.screenHeightDp * 0.82f).toInt() else 420
+
+    DesktopCard(width = if (settings.drawer == DesktopStore.Drawer.GRID) 520 else 360, maxHeight = cap) {
         MontLabel("APPS", size = 16, alpha = MontWhite.PRIMARY)
-        Spacer(Modifier.height(10.dp * LocalMontScale.current))
-        apps.forEach { app ->
-            MontRow(label = app.label) { onOpen(app) }
+        Spacer(Modifier.height(10.dp * scale))
+
+        when (settings.drawer) {
+            DesktopStore.Drawer.LIST -> apps.forEach { app ->
+                MontRow(label = app.label) { onOpen(app) }
+            }
+
+            DesktopStore.Drawer.GRID -> Grid(apps, settings, onOpen)
         }
-        Spacer(Modifier.height(10.dp * LocalMontScale.current))
+
+        Spacer(Modifier.height(10.dp * scale))
         MontRow(label = "Settings", active = false) { onSettings() }
         MontRow(label = "Close", active = false) { onClose() }
     }
 }
 
 /**
- * Settings, as a card.
+ * Applications in rows of icons, down or sideways.
  *
- * On a phone this would open hard against the top of the screen with no header, because a panel
- * over the thing it edits is unmistakably about it. A card floating in the middle of a wallpaper is
- * about nothing until it says so, which is why this is the one titled surface in the language.
+ * Laid out by hand rather than with a lazy grid, because the card it lives in already scrolls and
+ * two scrolling containers inside each other is a fight neither of them wins.
+ */
+@Composable
+private fun Grid(
+    apps: List<DesktopApp>,
+    settings: DesktopStore.State,
+    onOpen: (DesktopApp) -> Unit
+) {
+    val scale = LocalMontScale.current
+    val columns = settings.drawerColumns.coerceIn(3, 8)
+
+    if (settings.drawerPaged) {
+        // Sideways, in pages: a page is as many rows as fit beside the columns, so a page is always
+        // a rectangle of icons rather than a run that stops wherever it ran out.
+        val perPage = columns * 4
+        val pages = apps.chunked(perPage)
+        val state = rememberPagerState { pages.size.coerceAtLeast(1) }
+        Column {
+            HorizontalPager(state = state) { index ->
+                Column {
+                    pages.getOrNull(index).orEmpty().chunked(columns).forEach { row ->
+                        GridRow(row, columns, settings.drawerTitles, onOpen)
+                    }
+                }
+            }
+            if (pages.size > 1) {
+                Spacer(Modifier.height(8.dp * scale))
+                // Selected is simply the bright one, even when the thing selected is a page.
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp * scale)) {
+                    repeat(pages.size) { index ->
+                        MontLabel(
+                            "${index + 1}",
+                            size = 11,
+                            alpha = if (index == state.currentPage) MontWhite.ACTIVE else MontWhite.DIM
+                        )
+                    }
+                }
+            }
+        }
+    } else {
+        Column {
+            apps.chunked(columns).forEach { row ->
+                GridRow(row, columns, settings.drawerTitles, onOpen)
+            }
+        }
+    }
+}
+
+@Composable
+private fun GridRow(
+    row: List<DesktopApp>,
+    columns: Int,
+    titles: Boolean,
+    onOpen: (DesktopApp) -> Unit
+) {
+    val scale = LocalMontScale.current
+    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp * scale)) {
+        row.forEach { app ->
+            Column(
+                Modifier
+                    .weight(1f)
+                    .combinedClickable { onOpen(app) },
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                val icon = app.icon
+                if (icon != null) {
+                    Image(icon, contentDescription = app.label, modifier = Modifier.size(40.dp * scale))
+                } else {
+                    MontLabel(app.label.take(1).uppercase(), size = 20)
+                }
+                if (titles) {
+                    Spacer(Modifier.height(4.dp * scale))
+                    MontLabel(app.label, size = 10, alpha = MontWhite.DETAIL)
+                }
+            }
+        }
+        // The last row is padded out so its icons sit under the ones above them rather than
+        // spreading to fill the width.
+        repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+    }
+}
+
+/** The categories down the left of the settings card. */
+private enum class Section(val label: String) {
+    WALLPAPER("Wallpaper"),
+    TASKBAR("Taskbar"),
+    DRAWER("App drawer"),
+    STATUS("Status")
+}
+
+/**
+ * Settings, as one black card with a sidebar.
+ *
+ * The categories run down the left and what they hold sits beside them, with nothing drawn between
+ * the two — no rule, no divider, no change of shade. Selected is the bright one and the rest are
+ * dim, which is the same rule a row, a chip and an open window already follow, and it is enough:
+ * a line between two columns is the language admitting the type could not do the job.
+ *
+ * On a phone a Mont panel opens over the thing it edits and needs no header. A card floating in the
+ * middle of a wallpaper is about nothing until it says so, which is why this is the one titled
+ * surface in miniMont.
  */
 @Composable
 private fun SettingsCard(
@@ -379,40 +502,138 @@ private fun SettingsCard(
     onGrantNotifications: () -> Unit,
     onClose: () -> Unit
 ) {
-    DesktopCard {
+    val scale = LocalMontScale.current
+    var section by remember { mutableStateOf(Section.WALLPAPER) }
+
+    DesktopCard(width = 560, maxHeight = 400) {
         MontLabel("SETTINGS", size = 16, alpha = MontWhite.PRIMARY)
-        Spacer(Modifier.height(10.dp * LocalMontScale.current))
-        MontLabel("WALLPAPER", size = 11, alpha = MontWhite.DETAIL)
-        Spacer(Modifier.height(6.dp * LocalMontScale.current))
-        DesktopStore.Backdrop.entries.forEach { backdrop ->
-            if (backdrop == DesktopStore.Backdrop.IMAGE) {
-                MontRow(
-                    label = backdrop.label,
-                    trailing = if (state.image == null) "choose" else "change",
-                    active = state.backdrop == backdrop
-                ) {
-                    if (state.image == null) onPickImage() else DesktopStore.setBackdrop(backdrop)
+        Spacer(Modifier.height(14.dp * scale))
+
+        Row(Modifier.fillMaxWidth()) {
+            Column(Modifier.width(140.dp * scale)) {
+                Section.entries.forEach { candidate ->
+                    MontRow(
+                        label = candidate.label,
+                        active = candidate == section
+                    ) { section = candidate }
                 }
-                if (state.image != null) {
-                    MontRow(label = "Choose another picture", active = false) { onPickImage() }
+            }
+            Spacer(Modifier.width(22.dp * scale))
+            Column(Modifier.weight(1f)) {
+                when (section) {
+                    Section.WALLPAPER -> WallpaperSection(state, onPickImage)
+                    Section.TASKBAR -> TaskbarSection(state)
+                    Section.DRAWER -> DrawerSection(state)
+                    Section.STATUS -> StatusSection(notifications, onGrantNotifications)
                 }
-            } else {
-                MontRow(
-                    label = backdrop.label,
-                    active = state.backdrop == backdrop
-                ) { DesktopStore.setBackdrop(backdrop) }
             }
         }
-        if (!notifications) {
-            Spacer(Modifier.height(14.dp * LocalMontScale.current))
-            MontLabel("STATUS", size = 11, alpha = MontWhite.DETAIL)
-            Spacer(Modifier.height(6.dp * LocalMontScale.current))
-            // Asked for here rather than at the door, because the desktop works without it and a
-            // permission demanded before anything has been shown is a permission nobody grants.
-            MontRow(label = "Show the notification count", active = false) { onGrantNotifications() }
-        }
-        Spacer(Modifier.height(10.dp * LocalMontScale.current))
+
+        Spacer(Modifier.height(14.dp * scale))
         MontRow(label = "Close", active = false) { onClose() }
+    }
+}
+
+@Composable
+private fun WallpaperSection(state: DesktopStore.State, onPickImage: () -> Unit) {
+    DesktopStore.Backdrop.entries.forEach { backdrop ->
+        if (backdrop == DesktopStore.Backdrop.IMAGE) {
+            MontRow(
+                label = backdrop.label,
+                trailing = if (state.image == null) "choose" else "change",
+                active = state.backdrop == backdrop
+            ) {
+                if (state.image == null) onPickImage() else DesktopStore.setBackdrop(backdrop)
+            }
+            if (state.image != null) {
+                MontRow(label = "Choose another picture", active = false) { onPickImage() }
+            }
+        } else {
+            MontRow(
+                label = backdrop.label,
+                active = state.backdrop == backdrop
+            ) { DesktopStore.setBackdrop(backdrop) }
+        }
+    }
+}
+
+/**
+ * How thick the bar is.
+ *
+ * Three steps and small ones, and each moves the icons, the padding and the type together — the
+ * bar's height is set by the clock stack rather than by the icons, so a thickness that only changed
+ * the icons would change nothing. The type never goes below the sizes Mont already uses for a clock
+ * and an explanatory line: a thinner bar you cannot read the date on is not thinner, it is broken.
+ */
+@Composable
+private fun TaskbarSection(state: DesktopStore.State) {
+    val scale = LocalMontScale.current
+    val options = DesktopStore.Thickness.entries
+    MontLabel("THICKNESS", size = 11, alpha = MontWhite.DETAIL)
+    Spacer(Modifier.height(6.dp * scale))
+    MontChips(
+        options = options.map { it.label },
+        selected = options.indexOf(state.thickness)
+    ) { index -> DesktopStore.setThickness(options[index]) }
+    Spacer(Modifier.height(10.dp * scale))
+    MontDetail("Regular is the one everything else was drawn against.")
+}
+
+@Composable
+private fun DrawerSection(state: DesktopStore.State) {
+    val scale = LocalMontScale.current
+    val modes = DesktopStore.Drawer.entries
+
+    MontLabel("LAYOUT", size = 11, alpha = MontWhite.DETAIL)
+    Spacer(Modifier.height(6.dp * scale))
+    MontChips(
+        options = modes.map { it.label },
+        selected = modes.indexOf(state.drawer)
+    ) { index -> DesktopStore.setDrawer(modes[index]) }
+
+    if (state.drawer == DesktopStore.Drawer.GRID) {
+        Spacer(Modifier.height(12.dp * scale))
+        MontLabel("COLUMNS", size = 11, alpha = MontWhite.DETAIL)
+        Spacer(Modifier.height(6.dp * scale))
+        val columns = listOf(3, 4, 5, 6, 7, 8)
+        MontChips(
+            options = columns.map { "$it" },
+            selected = columns.indexOf(state.drawerColumns)
+        ) { index -> DesktopStore.setDrawerColumns(columns[index]) }
+
+        Spacer(Modifier.height(10.dp * scale))
+        SettingToggle("Names under icons", state.drawerTitles) { DesktopStore.setDrawerTitles(it) }
+    }
+
+    Spacer(Modifier.height(6.dp * scale))
+    SettingToggle("Sideways in pages", state.drawerPaged) { DesktopStore.setDrawerPaged(it) }
+    SettingToggle("SuperFill", state.superFill) { DesktopStore.setSuperFill(it) }
+    Spacer(Modifier.height(6.dp * scale))
+    MontDetail("SuperFill lets the drawer take the screen when it has more than fits.")
+}
+
+@Composable
+private fun StatusSection(granted: Boolean, onGrant: () -> Unit) {
+    if (granted) {
+        MontDetail("Notifications are being counted.")
+    } else {
+        // Asked for here rather than at the door: the desktop works without it, and a permission
+        // demanded before anything has been shown is a permission nobody grants.
+        MontRow(label = "Show the notification count") { onGrant() }
+        Spacer(Modifier.height(6.dp * LocalMontScale.current))
+        MontDetail("miniMont keeps one number, and reads nothing it does not show.")
+    }
+}
+
+/** A row with a Mont toggle at the end of it. Never a Material switch. */
+@Composable
+private fun SettingToggle(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 7.dp * LocalMontScale.current),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        MontLabel(label.uppercase(), Modifier.weight(1f), alpha = MontWhite.ACTIVE)
+        MontToggle(checked, onChange)
     }
 }
 
@@ -458,6 +679,7 @@ private fun ItemCard(
 private fun Taskbar(
     apps: List<DesktopApp>,
     running: List<String>,
+    thickness: DesktopStore.Thickness,
     onStart: () -> Unit,
     onOpen: (DesktopApp) -> Unit,
     onHold: (DesktopApp) -> Unit,
@@ -478,10 +700,11 @@ private fun Taskbar(
             .fillMaxWidth()
             .background(MontSurface)
             .onSizeChanged { onMeasured(it.height) }
-            .padding(BAR.dp * scale)
+            .padding(thickness.padding.dp * scale)
     ) {
         Navigation(
             Modifier.align(Alignment.CenterStart),
+            thickness = thickness,
             onBack = onBack,
             onHome = onHome,
             onWindows = onWindows
@@ -491,13 +714,14 @@ private fun Taskbar(
             horizontalArrangement = Arrangement.spacedBy(9.dp * scale),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            StartSquares(Modifier.size(ICON.dp * scale), onStart)
+            StartSquares(Modifier.size(thickness.icon.dp * scale), onStart)
             apps.forEach { app ->
-                DockItem(app, app.packageName in running, { onOpen(app) }, { onHold(app) })
+                DockItem(app, thickness, app.packageName in running, { onOpen(app) }, { onHold(app) })
             }
         }
         StatusBlock(
             Modifier.align(Alignment.CenterEnd),
+            thickness = thickness,
             onClock = onClock,
             onClockMenu = onClockMenu,
             onBattery = onBattery,
@@ -525,6 +749,7 @@ private fun Taskbar(
 @Composable
 private fun Navigation(
     modifier: Modifier = Modifier,
+    thickness: DesktopStore.Thickness,
     onBack: () -> Unit,
     onHome: () -> Unit,
     onWindows: () -> Unit
@@ -535,23 +760,23 @@ private fun Navigation(
         horizontalArrangement = Arrangement.spacedBy(10.dp * scale),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        NavMark(Mark.BACK, onBack)
-        NavMark(Mark.HOME, onHome)
-        NavMark(Mark.RECENTS, onWindows)
+        NavMark(Mark.BACK, thickness, onBack)
+        NavMark(Mark.HOME, thickness, onHome)
+        NavMark(Mark.RECENTS, thickness, onWindows)
     }
 }
 
 private enum class Mark { BACK, HOME, RECENTS }
 
 @Composable
-private fun NavMark(mark: Mark, onClick: () -> Unit) {
+private fun NavMark(mark: Mark, thickness: DesktopStore.Thickness, onClick: () -> Unit) {
     val scale = LocalMontScale.current
     var held by remember { mutableStateOf(false) }
     val alpha = if (held) MontWhite.ACTIVE else MontWhite.DIM
 
     Box(
         Modifier
-            .size(ICON.dp * scale)
+            .size(thickness.icon.dp * scale)
             .pointerInput(mark) {
                 detectTapGestures(
                     onPress = {
@@ -564,7 +789,7 @@ private fun NavMark(mark: Mark, onClick: () -> Unit) {
             },
         contentAlignment = Alignment.Center
     ) {
-        Canvas(Modifier.size(15.dp * scale)) {
+        Canvas(Modifier.size((thickness.icon / 2 + 1).dp * scale)) {
             val colour = Color.White.copy(alpha = alpha)
             val line = Stroke(width = 1.6f * scale)
             when (mark) {
@@ -624,6 +849,7 @@ private fun StartSquares(modifier: Modifier = Modifier, onClick: () -> Unit) {
 @Composable
 private fun DockItem(
     app: DesktopApp,
+    thickness: DesktopStore.Thickness,
     running: Boolean,
     onClick: () -> Unit,
     onHold: () -> Unit
@@ -631,7 +857,7 @@ private fun DockItem(
     val scale = LocalMontScale.current
     Box(
         Modifier
-            .size(ICON.dp * scale)
+            .size(thickness.icon.dp * scale)
             .combinedClickable(onClick = onClick, onLongClick = onHold),
         contentAlignment = Alignment.Center
     ) {
@@ -669,6 +895,7 @@ private fun DockItem(
 @Composable
 private fun StatusBlock(
     modifier: Modifier = Modifier,
+    thickness: DesktopStore.Thickness,
     onClock: () -> Unit,
     onClockMenu: () -> Unit,
     onBattery: () -> Unit,
@@ -729,8 +956,8 @@ private fun StatusBlock(
                 .combinedClickable(onClick = onClock, onLongClick = onClockMenu),
             horizontalAlignment = Alignment.End
         ) {
-            MontLabel(time, size = 16, alpha = MontWhite.PRIMARY)
-            MontLabel(date, size = 10, alpha = MontWhite.DETAIL)
+            MontLabel(time, size = thickness.time, alpha = MontWhite.PRIMARY)
+            MontLabel(date, size = thickness.date, alpha = MontWhite.DETAIL)
         }
     }
 }
@@ -943,15 +1170,8 @@ private fun QuickCard(
 }
 
 @Composable
-private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().padding(vertical = 7.dp * LocalMontScale.current),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        MontLabel(label.uppercase(), Modifier.weight(1f), alpha = MontWhite.ACTIVE)
-        MontToggle(checked, onChange)
-    }
-}
+private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) =
+    SettingToggle(label, checked, onChange)
 
 private fun wifiOn(context: Context): Boolean = runCatching {
     (context.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager).isWifiEnabled
