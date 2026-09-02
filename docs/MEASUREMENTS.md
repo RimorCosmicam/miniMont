@@ -116,6 +116,27 @@ and the whole thing moves to the shell side.
 
 ## 4. Moving and sizing another app's task, at drag speed
 
+> **Moving: answered. Z Flip 7, Android 16, 2 September 2026.**
+>
+> `IActivityTaskManager.moveRootTaskToDisplay(rootTaskId, displayId)` by reflection
+> works from the shell uid, first try, and neither shell fallback was needed —
+> `am display move-stack` in fact throws on this device. Measured end to end: Chrome
+> running on the cover screen, launched onto the miniMont display, `am start
+> --display` brought its existing task forward on the cover screen instead, the
+> launch check caught it, the binder call moved root task 793 to display 37, and the
+> window list then showed exactly one Chrome window, on 37.
+>
+> This is the same call MiniDex reaches for, so its warning stands and is why the
+> move is verified rather than believed: Samsung has been known to accept it and move
+> nothing.
+>
+> **Still open: sizing and positioning at 60Hz**, which is the half that matters for
+> dragging a window, and which this says nothing about.
+
+The original question, kept because the rest of it is still unanswered:
+
+## 4 (as originally written). Moving and sizing another app's task, at drag speed
+
 **Why it matters:** dragging a window is the desktop. A process spawn per motion
 event is not a slow drag, it is not a drag.
 

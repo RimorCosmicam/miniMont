@@ -62,10 +62,15 @@ public final class Desktop {
 
         int[] found = settle(packageName);
         if (found == null) {
-            // Nothing to correct, or nothing the framework will tell us about. The launch stands.
+            // Said out loud, because "it landed correctly" and "the framework would not tell us
+            // where it landed" look identical from here and want completely different fixes.
+            Ln.i("DESKTOP", "no task reported for " + packageName + "; leaving the launch alone");
             return true;
         }
-        if (found[1] == displayId) return true;
+        if (found[1] == displayId) {
+            Ln.i("DESKTOP", packageName + " is on display " + displayId + ", task " + found[0]);
+            return true;
+        }
 
         Ln.i("DESKTOP", packageName + " opened on display " + found[1] + ", not " + displayId);
         if (Tasks.moveToDisplay(found[0], displayId)) {
