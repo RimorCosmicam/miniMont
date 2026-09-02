@@ -115,9 +115,15 @@ about to get and see through it to what is under there.
 
 | Drag to | Result |
 |---|---|
-| Top edge | The whole screen, less the strip the dock and the status card occupy. The dock is never covered. |
+| Top edge | The whole screen, less the dock — and less one more gap. |
 | Left edge | The left half, same bottom limit. |
 | Right edge | The right half, same bottom limit. |
+
+**The gap under a filled window is the same gap that is under the dock.** The dock
+floats half its own padding clear of the bottom edge; a window filling the screen
+stops that same distance above the dock. One measurement, used twice, so the three
+bands — screen edge, dock, window — are evenly spaced instead of being two different
+decisions that happen to sit near each other.
 
 Quarters are not on the edges, because the corners are where sizing lives. Instead,
 **resting the pointer on the title bar** brings up the quarter chooser: four
