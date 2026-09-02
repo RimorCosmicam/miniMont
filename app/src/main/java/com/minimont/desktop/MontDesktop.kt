@@ -177,10 +177,13 @@ fun MontDesktop(
 
     Column(Modifier.fillMaxWidth()) {
 
-        // The notification centre lives down the right, where a shade has always been. Everything
-        // else opens in the middle, above the thing that opened it.
+        // The notification centre opens toward the right, where a shade has always been, and
+        // everything else in the middle above whatever opened it. It still floats clear of the
+        // edge by the bar's own padding — a card held against the side of the screen stops being a
+        // card and becomes a sidebar, which is a different object with different rules.
+        val gap = store.thickness.padding.dp * LocalMontScale.current
         Box(
-            Modifier.fillMaxWidth(),
+            Modifier.fillMaxWidth().padding(horizontal = gap),
             contentAlignment =
                 if (panel == Panel.NOTIFICATIONS) Alignment.CenterEnd else Alignment.Center
         ) {
@@ -1273,11 +1276,12 @@ private fun CalendarCard(onClose: () -> Unit) {
 @Composable
 private fun NotificationsCard(onClose: () -> Unit) {
     val scale = LocalMontScale.current
-    val configuration = LocalConfiguration.current
     val notes by Notifications.notes.collectAsState()
     val grouped = remember(notes) { notes.groupBy { it.packageName } }
 
-    DesktopCard(width = 380, maxHeight = (configuration.screenHeightDp * 0.78f).toInt()) {
+    // Capped like every other card and scrolling inside the cap, rather than running the height of
+    // the display. What made it read as a sidebar was the height, not the side it was on.
+    DesktopCard(width = 380, maxHeight = 420) {
         MontLabel("NOTIFICATIONS", size = 16, alpha = MontWhite.PRIMARY)
         Spacer(Modifier.height(10.dp * scale))
 
