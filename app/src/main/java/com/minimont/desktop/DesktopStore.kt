@@ -80,6 +80,7 @@ object DesktopStore {
     fun load(context: Context) {
         if (::preferences.isInitialized) return
         preferences = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        migrate()
         _state.value = State(
             backdrop = runCatching {
                 Backdrop.valueOf(preferences.getString(BACKDROP, null) ?: Backdrop.MONT.name)
@@ -98,6 +99,22 @@ object DesktopStore {
                 Thickness.valueOf(preferences.getString(THICKNESS, null) ?: Thickness.REGULAR.name)
             }.getOrDefault(Thickness.REGULAR)
         )
+    }
+
+    /**
+     * Move anybody still on the old default onto the new one, once.
+     *
+     * A default only applies until something is written down, and the mustard wash was written down
+     * the first time it was the default — so shipping a wallpaper and calling it the default changed
+     * nothing for anyone who had already run miniMont. This moves that one value and marks itself
+     * done, so a mustard chosen *afterwards* is a choice and stays one.
+     */
+    private fun migrate() {
+        if (preferences.getBoolean(MIGRATED, false)) return
+        preferences.edit().putBoolean(MIGRATED, true).apply()
+        if (preferences.getString(BACKDROP, null) == Backdrop.MUSTARD.name) {
+            preferences.edit().putString(BACKDROP, Backdrop.MONT.name).apply()
+        }
     }
 
     fun setBackdrop(backdrop: Backdrop) {
@@ -170,4 +187,5 @@ object DesktopStore {
     private const val DRAWER_PAGED = "drawer_paged"
     private const val SUPER_FILL = "super_fill"
     private const val THICKNESS = "thickness"
+    private const val MIGRATED = "mont_wallpaper_migrated"
 }
