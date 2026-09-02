@@ -793,14 +793,15 @@ private fun NavMark(mark: Mark, thickness: DesktopStore.Thickness, onClick: () -
             val colour = Color.White.copy(alpha = alpha)
             val line = Stroke(width = 1.6f * scale)
             when (mark) {
+                // A chevron: two strokes meeting at a point, and no shaft. An arrow points at
+                // something; back is a direction, and the circle and the square beside it are
+                // outlines of the same weight rather than objects with parts.
                 Mark.BACK -> {
                     val middle = size.height / 2f
-                    val head = size.width * .42f
-                    // A shaft with a head on it, rather than a solid triangle: the triangle reads as
-                    // "play, backwards" at this size and the arrow does not.
-                    drawLine(colour, Offset(size.width, middle), Offset(0f, middle), line.width)
-                    drawLine(colour, Offset(0f, middle), Offset(head, middle - head), line.width)
-                    drawLine(colour, Offset(0f, middle), Offset(head, middle + head), line.width)
+                    val tip = size.width * .28f
+                    val reach = size.width * .78f
+                    drawLine(colour, Offset(reach, middle - (reach - tip)), Offset(tip, middle), line.width)
+                    drawLine(colour, Offset(tip, middle), Offset(reach, middle + (reach - tip)), line.width)
                 }
 
                 Mark.HOME -> drawCircle(

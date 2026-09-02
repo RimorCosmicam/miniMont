@@ -17,6 +17,8 @@ object DesktopStore {
 
     /** The backdrops that need no file: drawn, not loaded. */
     enum class Backdrop(val label: String) {
+        /** The one miniMont ships with, and what it looks like before anybody chooses anything. */
+        MONT("Mont"),
         MUSTARD("Mustard"),
         BLACK("Black"),
         LIVE("Green"),
@@ -49,7 +51,7 @@ object DesktopStore {
     }
 
     data class State(
-        val backdrop: Backdrop = Backdrop.MUSTARD,
+        val backdrop: Backdrop = Backdrop.MONT,
         /** The chosen picture, if there is one. Held even while another backdrop is showing. */
         val image: String? = null,
         val pinned: List<String> = emptyList(),
@@ -80,8 +82,8 @@ object DesktopStore {
         preferences = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         _state.value = State(
             backdrop = runCatching {
-                Backdrop.valueOf(preferences.getString(BACKDROP, null) ?: Backdrop.MUSTARD.name)
-            }.getOrDefault(Backdrop.MUSTARD),
+                Backdrop.valueOf(preferences.getString(BACKDROP, null) ?: Backdrop.MONT.name)
+            }.getOrDefault(Backdrop.MONT),
             image = preferences.getString(IMAGE, null),
             pinned = preferences.getString(PINNED, "").orEmpty()
                 .split(',').filter { it.isNotBlank() },

@@ -21,6 +21,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import com.minimont.R
 import com.minimont.ui.mont.MontAccent
 
 /**
@@ -64,6 +66,15 @@ fun Backdrop(state: DesktopStore.State, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     Box(modifier.fillMaxSize().background(Color.Black)) {
         when (state.backdrop) {
+            // Bundled at 1920x1080, which is the largest display miniMont drives — scaled from the
+            // original rather than cropped, since it was already the shape of the screen.
+            DesktopStore.Backdrop.MONT -> Image(
+                painterResource(R.drawable.wallpaper),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+
             DesktopStore.Backdrop.BLACK -> Unit
 
             DesktopStore.Backdrop.MUSTARD -> Glow(MontAccent.Mustard)
