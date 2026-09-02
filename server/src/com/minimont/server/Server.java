@@ -266,6 +266,10 @@ public final class Server {
                 announce(true);
                 break;
             }
+            case "open": {
+                if (display != null && !argument.isEmpty()) Desktop.open(display.id(), argument);
+                break;
+            }
             case "area": {
                 String[] parts = argument.split(" ");
                 if (parts.length == 4) {

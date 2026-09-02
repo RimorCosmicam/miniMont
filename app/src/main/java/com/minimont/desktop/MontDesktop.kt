@@ -34,6 +34,11 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Text
@@ -46,6 +51,7 @@ import com.minimont.ui.mont.LocalMontScale
 import com.minimont.ui.mont.Mont
 import com.minimont.ui.mont.MontAccent
 import com.minimont.ui.mont.MontCard
+import com.minimont.ui.mont.MontDetail
 import com.minimont.ui.mont.MontLabel
 import com.minimont.ui.mont.MontRow
 import com.minimont.ui.mont.MontSurface
@@ -76,7 +82,39 @@ private const val ICON = 30
 private const val BAR = 7
 
 /** What the chrome can have open above the dock. At most one, because two is a window manager. */
-private enum class Panel { NONE, APPS, SETTINGS, ITEM, CALENDAR, NOTIFICATIONS, QUICK }
+private enum class Panel {
+    NONE, APPS, SETTINGS, ITEM, CALENDAR, NOTIFICATIONS, QUICK, WINDOWS,
+    CLOCK_MENU, BATTERY_MENU, NOTIFICATION_MENU
+}
+
+/** The phone's own screens, named by what they do rather than by which class does them. */
+private object Phone {
+    const val ALARMS = "android.intent.action.SHOW_ALARMS"
+    const val DATE_TIME = "android.settings.DATE_SETTINGS"
+    const val BATTERY = "android.intent.action.POWER_USAGE_SUMMARY"
+    const val BATTERY_SAVER = "android.settings.BATTERY_SAVER_SETTINGS"
+    const val NOTIFICATIONS = "android.settings.NOTIFICATION_SETTINGS"
+}
+
+/**
+ * A second-button press, and the long press that stands in for it.
+ *
+ * The desktop has a real mouse now, so the taskbar answers a right click the way everything else on
+ * a desktop does. It also answers a long press, because the tablet at the other end has fingers and
+ * no second button, and an action that exists only for one of the two input devices is an action
+ * half the users cannot reach.
+ */
+private fun Modifier.secondary(onClick: () -> Unit): Modifier = this.pointerInput(onClick) {
+    awaitPointerEventScope {
+        while (true) {
+            val event = awaitPointerEvent()
+            if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) {
+                event.changes.forEach { it.consume() }
+                onClick()
+            }
+        }
+    }
+}
 
 /**
  * Everything miniMont draws above the windows: the dock, the status card, and whatever card is
@@ -98,7 +136,10 @@ fun MontDesktop(
     onWifi: (Boolean) -> Unit,
     onBatterySaver: (Boolean) -> Unit,
     onFit: (String) -> Unit,
-    onArea: (Int, Int, Int, Int) -> Unit
+    onArea: (Int, Int, Int, Int) -> Unit,
+    onOpenPhone: (String) -> Unit,
+    onBack: () -> Unit,
+    onHome: () -> Unit
 ) {
     val context = LocalContext.current
     val store by DesktopStore.state.collectAsState()
@@ -190,6 +231,58 @@ fun MontDesktop(
                 onClose = { panel = Panel.NONE }
             )
 
+            Panel.WINDOWS -> WindowsCard(
+                apps = apps.filter { it.packageName in running },
+                onFocus = { app ->
+                    panel = Panel.NONE
+                    onLaunch(app.component)
+                },
+                onClose = { app -> onClose(app.packageName) },
+                onDismiss = { panel = Panel.NONE }
+            )
+
+            Panel.CLOCK_MENU -> MenuCard(
+                title = "CLOCK",
+                rows = listOf(
+                    "Alarms" to Phone.ALARMS,
+                    "Date and time" to Phone.DATE_TIME
+                ),
+                onOpen = { action ->
+                    panel = Panel.NONE
+                    onOpenPhone(action)
+                },
+                onDismiss = { panel = Panel.NONE }
+            )
+
+            Panel.BATTERY_MENU -> MenuCard(
+                title = "BATTERY",
+                rows = listOf(
+                    "Battery usage" to Phone.BATTERY,
+                    "Battery saver" to Phone.BATTERY_SAVER
+                ),
+                onOpen = { action ->
+                    panel = Panel.NONE
+                    onOpenPhone(action)
+                },
+                onDismiss = { panel = Panel.NONE }
+            )
+
+            Panel.NOTIFICATION_MENU -> MenuCard(
+                title = "NOTIFICATIONS",
+                rows = listOf("Notification settings" to Phone.NOTIFICATIONS),
+                leading = {
+                    MontRow(label = "Clear all") {
+                        Notifications.dismissAll()
+                        panel = Panel.NONE
+                    }
+                },
+                onOpen = { action ->
+                    panel = Panel.NONE
+                    onOpenPhone(action)
+                },
+                onDismiss = { panel = Panel.NONE }
+            )
+
             Panel.CALENDAR -> CalendarCard { panel = Panel.NONE }
 
             Panel.NOTIFICATIONS -> NotificationsCard { panel = Panel.NONE }
@@ -214,11 +307,17 @@ fun MontDesktop(
                 panel = Panel.ITEM
             },
             onMeasured = { bar = it },
+            onBack = onBack,
+            onHome = onHome,
+            onWindows = { panel = if (panel == Panel.WINDOWS) Panel.NONE else Panel.WINDOWS },
             onClock = { panel = if (panel == Panel.CALENDAR) Panel.NONE else Panel.CALENDAR },
+            onClockMenu = { panel = Panel.CLOCK_MENU },
             onBattery = { panel = if (panel == Panel.QUICK) Panel.NONE else Panel.QUICK },
+            onBatteryMenu = { panel = Panel.BATTERY_MENU },
             onNotifications = {
                 panel = if (panel == Panel.NOTIFICATIONS) Panel.NONE else Panel.NOTIFICATIONS
-            }
+            },
+            onNotificationMenu = { panel = Panel.NOTIFICATION_MENU }
         )
     }
 }
@@ -349,13 +448,10 @@ private fun ItemCard(
  * The taskbar.
  *
  * A full-width Mont surface along the bottom edge — no gap to the sides, no gap underneath, because
- * a bar *is* the edge of the screen. That is the whole difference from the dock it replaces: a dock
- * floats and has to be told apart from what is behind it, and a bar does not.
+ * a bar *is* the edge of the screen.
  *
- * What stands in it is arranged like a dock anyway. The mustard grid and the open applications sit
- * in the middle, where they are equidistant from wherever the pointer happens to be, and the clock
- * block holds the right end because that is where a clock has lived on every bar anybody has used
- * and there is nothing to gain by being clever about it.
+ * Three things stand in it, and they are the three things a desktop's bottom edge has always held:
+ * the way back at the left, what you can open in the middle, and what is true at the right.
  */
 @Composable
 private fun Taskbar(
@@ -365,9 +461,15 @@ private fun Taskbar(
     onOpen: (DesktopApp) -> Unit,
     onHold: (DesktopApp) -> Unit,
     onMeasured: (Int) -> Unit,
+    onBack: () -> Unit,
+    onHome: () -> Unit,
+    onWindows: () -> Unit,
     onClock: () -> Unit,
+    onClockMenu: () -> Unit,
     onBattery: () -> Unit,
-    onNotifications: () -> Unit
+    onBatteryMenu: () -> Unit,
+    onNotifications: () -> Unit,
+    onNotificationMenu: () -> Unit
 ) {
     val scale = LocalMontScale.current
     Box(
@@ -377,6 +479,12 @@ private fun Taskbar(
             .onSizeChanged { onMeasured(it.height) }
             .padding(BAR.dp * scale)
     ) {
+        Navigation(
+            Modifier.align(Alignment.CenterStart),
+            onBack = onBack,
+            onHome = onHome,
+            onWindows = onWindows
+        )
         Row(
             Modifier.align(Alignment.Center),
             horizontalArrangement = Arrangement.spacedBy(9.dp * scale),
@@ -390,9 +498,43 @@ private fun Taskbar(
         StatusBlock(
             Modifier.align(Alignment.CenterEnd),
             onClock = onClock,
+            onClockMenu = onClockMenu,
             onBattery = onBattery,
-            onNotifications = onNotifications
+            onBatteryMenu = onBatteryMenu,
+            onNotifications = onNotifications,
+            onNotificationMenu = onNotificationMenu
         )
+    }
+}
+
+/**
+ * Back, home and windows, at the left.
+ *
+ * All three mean something *inside* miniMont and nothing outside it. Home shows the desktop rather
+ * than leaving for the phone's launcher — leaving would end the thing you are using. Windows lists
+ * what is open here, not what Android has in its own recents. Back is the only one that is what it
+ * looks like: it goes back in whatever has focus.
+ *
+ * Words rather than a triangle, a circle and a square. Mont says a thing with a word when a word
+ * will do, and these three have been three shapes for fifteen years without anybody agreeing which
+ * shape is which.
+ */
+@Composable
+private fun Navigation(
+    modifier: Modifier = Modifier,
+    onBack: () -> Unit,
+    onHome: () -> Unit,
+    onWindows: () -> Unit
+) {
+    val scale = LocalMontScale.current
+    Row(
+        modifier,
+        horizontalArrangement = Arrangement.spacedBy(14.dp * scale),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        MontLabel("BACK", Modifier.combinedClickable(onClick = onBack), alpha = MontWhite.DIM, size = 11)
+        MontLabel("HOME", Modifier.combinedClickable(onClick = onHome), alpha = MontWhite.DIM, size = 11)
+        MontLabel("WINDOWS", Modifier.combinedClickable(onClick = onWindows), alpha = MontWhite.DIM, size = 11)
     }
 }
 
@@ -456,24 +598,26 @@ private fun DockItem(
 }
 
 /**
- * The clock block: four facts in a two by two grid.
+ * What is true, at the right end of the bar.
  *
- * Hours and minutes on the top row with the colon between them, and under each the number that
- * belongs there — the battery under the hours, what is waiting under the minutes. All four at one
- * size, because they are four facts of equal standing and setting two of them smaller would be
- * saying that the battery matters less than the hour, which is not true at four percent.
+ * Three things in a row, each the shape of the thing it is: a bubble holding what is waiting, a
+ * battery holding how much is left, and the time with the date under it. The grid of four bare
+ * numbers this replaces made you work out which number was which every time you looked at it, which
+ * is the opposite of what a status bar is for.
  *
- * The colon stays. Two numbers side by side are two numbers; with the colon they are a time.
- *
- * The battery is green because it is the one number here about the phone rather than about the
- * time, and red under twenty, which is the only place red appears in miniMont.
+ * Each answers a left click with the thing you usually want and a right click with the phone's own
+ * screen for it — and a long press does what the right click does, because the tablet has fingers
+ * and no second button.
  */
 @Composable
 private fun StatusBlock(
     modifier: Modifier = Modifier,
     onClock: () -> Unit,
+    onClockMenu: () -> Unit,
     onBattery: () -> Unit,
-    onNotifications: () -> Unit
+    onBatteryMenu: () -> Unit,
+    onNotifications: () -> Unit,
+    onNotificationMenu: () -> Unit
 ) {
     val context = LocalContext.current
     val scale = LocalMontScale.current
@@ -489,54 +633,182 @@ private fun StatusBlock(
         }
     }
 
-    val hours = remember(now) { SimpleDateFormat("HH", Locale.getDefault()).format(now) }
-    val minutes = remember(now) { SimpleDateFormat("mm", Locale.getDefault()).format(now) }
-    val column = 26.dp * scale
-    val gutter = 9.dp * scale
+    val time = remember(now) { SimpleDateFormat("HH:mm", Locale.getDefault()).format(now) }
+    val date = remember(now) { SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(now) }
+    val level = if (battery in 1..19) MontAccent.LowBattery else MontAccent.Live
 
-    Column(modifier) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Cell(Modifier.width(column).combinedClickable(onClick = onClock)) {
-                MontLabel(hours, size = CLOCK, alpha = MontWhite.PRIMARY)
-            }
-            Cell(Modifier.width(gutter)) {
-                MontLabel(":", size = CLOCK, alpha = MontWhite.DIM)
-            }
-            Cell(Modifier.width(column).combinedClickable(onClick = onClock)) {
-                MontLabel(minutes, size = CLOCK, alpha = MontWhite.PRIMARY)
-            }
+    Row(
+        modifier,
+        horizontalArrangement = Arrangement.spacedBy(14.dp * scale),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Nothing announces itself: with nothing waiting there is no bubble, not an empty one.
+        if (notes.isNotEmpty()) {
+            Bubble(
+                count = notes.size,
+                modifier = Modifier
+                    .secondary(onNotificationMenu)
+                    .combinedClickable(
+                        onClick = onNotifications,
+                        onLongClick = onNotificationMenu
+                    )
+            )
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Cell(Modifier.width(column).combinedClickable(onClick = onBattery)) {
+
+        Row(
+            Modifier
+                .secondary(onBatteryMenu)
+                .combinedClickable(onClick = onBattery, onLongClick = onBatteryMenu),
+            horizontalArrangement = Arrangement.spacedBy(5.dp * scale),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            MontLabel("$battery%", size = 13, colour = level, alpha = 1f)
+            BatteryMark(battery, level, Modifier.size(width = 22.dp * scale, height = 11.dp * scale))
+        }
+
+        Column(
+            Modifier
+                .secondary(onClockMenu)
+                .combinedClickable(onClick = onClock, onLongClick = onClockMenu),
+            horizontalAlignment = Alignment.End
+        ) {
+            MontLabel(time, size = 16, alpha = MontWhite.PRIMARY)
+            MontLabel(date, size = 10, alpha = MontWhite.DETAIL)
+        }
+    }
+}
+
+/**
+ * A bubble with a number in it.
+ *
+ * Square, because Mont rounds nothing, with a tail cut from the same white so it reads as something
+ * said rather than as a badge stuck on. White is the language's *active* — this is the one thing on
+ * the bar that is asking for something.
+ */
+@Composable
+private fun Bubble(count: Int, modifier: Modifier = Modifier) {
+    val scale = LocalMontScale.current
+    Column(modifier, horizontalAlignment = Alignment.Start) {
+        Box(
+            Modifier
+                .background(Color.White)
+                .padding(horizontal = 5.dp * scale, vertical = 1.dp * scale)
+        ) {
+            Text(
+                if (count > 99) "99" else "$count",
+                color = Color.Black,
+                fontFamily = Mont,
+                fontWeight = FontWeight.Black,
+                fontSize = (13 * scale).sp,
+                maxLines = 1
+            )
+        }
+        Canvas(Modifier.size(width = 7.dp * scale, height = 4.dp * scale)) {
+            val tail = Path().apply {
+                moveTo(0f, 0f)
+                lineTo(size.width, 0f)
+                lineTo(0f, size.height)
+                close()
+            }
+            drawPath(tail, Color.White)
+        }
+    }
+}
+
+/**
+ * A battery, drawn rather than written.
+ *
+ * An outline at Mont's border alpha, a fill in the same colour the percentage is written in, and a
+ * cap. Vector, not a glyph — the language's objection is to saying things with little pictures when
+ * a word would do, and here the word is already standing next to it saying the exact number.
+ */
+@Composable
+private fun BatteryMark(level: Int, colour: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val cap = size.width * .09f
+        val body = size.width - cap - 1f
+        drawRect(
+            Color.White.copy(alpha = MontWhite.BORDER),
+            topLeft = Offset.Zero,
+            size = Size(body, size.height),
+            style = Stroke(width = 1.4f)
+        )
+        val inset = 2.5f
+        val fill = ((body - inset * 2) * (level.coerceIn(0, 100) / 100f)).coerceAtLeast(0f)
+        drawRect(colour, Offset(inset, inset), Size(fill, size.height - inset * 2))
+        drawRect(
+            Color.White.copy(alpha = MontWhite.BORDER),
+            Offset(body + 1f, size.height * .3f),
+            Size(cap, size.height * .4f)
+        )
+    }
+}
+
+/**
+ * What is open here, and only here.
+ *
+ * Android's own recents holds everything the phone has been doing, most of which is not on this
+ * screen and none of which this screen put there. This is the desktop's own list: the windows
+ * miniMont opened, with the same two things you can do to any of them.
+ */
+@Composable
+private fun WindowsCard(
+    apps: List<DesktopApp>,
+    onFocus: (DesktopApp) -> Unit,
+    onClose: (DesktopApp) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val scale = LocalMontScale.current
+    DesktopCard(width = 360, maxHeight = 380) {
+        MontLabel("WINDOWS", size = 16, alpha = MontWhite.PRIMARY)
+        Spacer(Modifier.height(10.dp * scale))
+
+        if (apps.isEmpty()) MontDetail("Nothing open.")
+
+        apps.forEach { app ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                MontRow(label = app.label, modifier = Modifier.weight(1f)) { onFocus(app) }
                 MontLabel(
-                    "$battery",
-                    size = CLOCK,
-                    colour = if (battery in 1..19) MontAccent.LowBattery else MontAccent.Live,
-                    alpha = 1f
+                    "X",
+                    Modifier
+                        .combinedClickable { onClose(app) }
+                        .padding(start = 8.dp * scale),
+                    alpha = MontWhite.ACTIVE,
+                    size = 15
                 )
             }
-            Spacer(Modifier.width(gutter))
-            Cell(Modifier.width(column).combinedClickable(onClick = onNotifications)) {
-                // Nothing announces itself: at zero the count is not drawn faintly, and the block
-                // it lives in is not drawn either. The cell is simply empty.
-                if (notes.isNotEmpty()) {
-                    Box(
-                        Modifier
-                            .background(Color.White)
-                            .padding(horizontal = 3.dp * scale)
-                    ) {
-                        Text(
-                            if (notes.size > 99) "99" else "${notes.size}",
-                            color = Color.Black,
-                            fontFamily = Mont,
-                            fontWeight = FontWeight.Black,
-                            fontSize = (CLOCK * scale).sp,
-                            maxLines = 1
-                        )
-                    }
-                }
-            }
         }
+
+        Spacer(Modifier.height(10.dp * scale))
+        MontRow(label = "Close", active = false) { onDismiss() }
+    }
+}
+
+/**
+ * A short list of the phone's own screens.
+ *
+ * What a right click on the bar opens. Everything on it is somewhere Android already has a screen
+ * for — miniMont does not reimplement an alarm clock or a battery graph, it opens theirs on the
+ * desktop as a window like anything else.
+ */
+@Composable
+private fun MenuCard(
+    title: String,
+    rows: List<Pair<String, String>>,
+    onOpen: (String) -> Unit,
+    onDismiss: () -> Unit,
+    leading: @Composable (() -> Unit)? = null
+) {
+    val scale = LocalMontScale.current
+    DesktopCard(width = 300, maxHeight = 260) {
+        MontLabel(title, size = 16, alpha = MontWhite.PRIMARY)
+        Spacer(Modifier.height(10.dp * scale))
+        leading?.invoke()
+        rows.forEach { (label, action) ->
+            MontRow(label = label) { onOpen(action) }
+        }
+        Spacer(Modifier.height(10.dp * scale))
+        MontRow(label = "Close", active = false) { onDismiss() }
     }
 }
 
@@ -544,13 +816,10 @@ private fun StatusBlock(
  * The same scale the chrome is composed at, worked out from the same rule.
  *
  * Duplicated here rather than read from the composition local, because the area has to be computed
- * from the display's own dimensions and not from whatever the surface it is drawn in happens to be.
+ * from the display's own dimensions and not from whatever surface it is drawn in.
  */
 private fun scaleOf(configuration: android.content.res.Configuration): Float =
     (minOf(configuration.screenWidthDp, configuration.screenHeightDp) / 560f).coerceIn(1f, 1.6f)
-
-/** One size for all four facts in the block. */
-private const val CLOCK = 15
 
 /** One square of the grid. Equal width, centred, so four different things line up as four. */
 @Composable

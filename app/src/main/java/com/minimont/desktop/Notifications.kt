@@ -48,6 +48,11 @@ object Notifications {
         runCatching { service?.cancelNotification(key) }
     }
 
+    /** All of them, which is the only thing anybody ever wants to do to all of them. */
+    fun dismissAll() {
+        runCatching { service?.cancelAllNotifications() }
+    }
+
     /** Whether Android has been told this app may see them. Without it the list stays empty. */
     fun granted(context: Context): Boolean {
         val enabled = Settings.Secure.getString(

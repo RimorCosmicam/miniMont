@@ -39,6 +39,9 @@ object MontWhite {
     const val DIM = .58f
     const val DISABLED = .35f
     const val TRACK = .09f
+
+    /** A border, on the rare object that needs one. */
+    const val BORDER = .34f
 }
 
 /** One accent at a time, never as decoration, always carrying a state. */

@@ -27,6 +27,9 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.minimont.DesktopController
 import com.minimont.ui.mont.LocalMontScale
 
+/** Android's own back key, sent to the display rather than to the phone. */
+private const val KEYCODE_BACK = 4
+
 /**
  * The dock, the status card and whatever is open above them, floating over the desktop.
  *
@@ -88,7 +91,13 @@ class DesktopChrome(
                         onWifi = controller::wifi,
                         onBatterySaver = controller::batterySaver,
                         onFit = controller::fit,
-                        onArea = controller::setArea
+                        onArea = controller::setArea,
+                        onOpenPhone = controller::open,
+                        // Back goes back in whatever has focus on this display.
+                        onBack = { controller.key(KEYCODE_BACK) },
+                        // Home shows the desktop rather than leaving for the phone's launcher.
+                        // Leaving would end the thing you are using.
+                        onHome = controller::showBackdrop
                     )
                 }
             }
