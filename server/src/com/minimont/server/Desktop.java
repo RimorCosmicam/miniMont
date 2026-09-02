@@ -103,7 +103,7 @@ public final class Desktop {
         }
         if (found[1] == displayId) {
             Ln.i("DESKTOP", packageName + " is on display " + displayId + ", task " + found[0]);
-            fit(packageName);
+            place(packageName);
             return true;
         }
 
@@ -112,13 +112,42 @@ public final class Desktop {
             int[] after = settle(packageName);
             if (after != null && after[1] == displayId) {
                 Ln.i("DESKTOP", "moved " + packageName + " to display " + displayId);
-                fit(packageName);
+                place(packageName);
                 return true;
             }
         }
 
         Ln.i("DESKTOP", "could not move " + packageName + "; opening a new window here instead");
         return start(displayId, component, FREEFORM, false, NEW_TASK | MULTIPLE_TASK);
+    }
+
+    /**
+     * Give a freshly opened window a desktop-sized one.
+     *
+     * An app decides its own freeform size, and what it decides is usually a phone: Chrome opens
+     * narrow enough to switch to its phone layout, which on a sixteen hundred pixel display is a
+     * column of website down the middle of a desk. Before the apps area existed it opened *larger*
+     * than the screen and got the tablet layout by accident — the layout was right and the size was
+     * unusable.
+     *
+     * So a launch is placed rather than merely clamped: most of the area, centred, which is wide
+     * enough that anything using width breakpoints lands on its large one. A window is only placed
+     * once, when it opens; after that it is yours and fit() will not touch its shape.
+     */
+    public static boolean place(String packageName) {
+        int[] safe = area;
+        if (safe[2] <= safe[0] || safe[3] <= safe[1]) return false;
+
+        int[] found = Tasks.find(packageName);
+        if (found == null) return false;
+
+        int width = (int) ((safe[2] - safe[0]) * 0.78f);
+        int height = (int) ((safe[3] - safe[1]) * 0.84f);
+        int left = safe[0] + ((safe[2] - safe[0]) - width) / 2;
+        int top = safe[1] + ((safe[3] - safe[1]) - height) / 2;
+        Ln.i("DESKTOP", "placing " + packageName + " at " + left + "," + top
+                + " " + width + "x" + height);
+        return Tasks.resize(found[0], left, top, left + width, top + height);
     }
 
     /**

@@ -433,6 +433,10 @@ public final class Server {
             // The backdrop goes on immediately. An empty trusted display is a black rectangle that
             // gives no sign of whether any of this worked, and the wallpaper arriving is the first
             // honest confirmation that a display exists and will hold a window.
+            // A provisional apps area, until the app measures its taskbar and says. Without one,
+            // the first window opened before the chrome had attached was placed nowhere and kept
+            // whatever size the app chose for itself — which for Chrome is a phone.
+            Desktop.setArea(8, 8, width - 8, height - 8);
             if (!backdrop.isEmpty() && !Desktop.backdrop(display.id(), backdrop)) {
                 // The one failure that must never be a black screen with no explanation. A display
                 // without system decorations that will not take an activity is the project's
