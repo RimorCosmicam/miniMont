@@ -70,18 +70,22 @@ public final class Encoder {
         // that move are a cursor and a window. What it was buying was not detail, it was a send
         // queue that could not keep up, and a fragment dropped from a frame is worse than a frame
         // encoded slightly softer.
-        int bitrate = (int) Math.min(24_000_000L, Math.max(8_000_000L, pixels * 30 * 22 / 100));
+        int bitrate = (int) Math.min(24_000_000L, Math.max(10_000_000L, pixels * 40 * 22 / 100));
         format.setInteger(MediaFormat.KEY_BIT_RATE, bitrate);
 
-        // Thirty, because thirty is what a desktop actually produces.
+        // Forty, because forty is what this produces when it matters.
         //
-        // This declaration is not a request, it is the divisor: rate control spends
-        // bitrate ÷ frame rate on each picture. Claiming sixty while delivering nineteen told the
-        // encoder to budget 116 kbit a frame and then handed it a third of the frames to spend it
-        // on — so every picture was coded thin, detail dissolved between keyframes, and the
-        // keyframe arrived and put it all back at once. That is the smear, and the flash at the end
-        // of it, and neither was the network.
-        format.setInteger(MediaFormat.KEY_FRAME_RATE, 30);
+        // The declaration is not a request, it is the divisor: rate control spends
+        // bitrate ÷ frame rate on each picture. Claiming sixty while delivering nineteen budgeted
+        // 116 kbit a frame and then handed the encoder a third of the frames to spend it on, so
+        // every picture was coded thin and the keyframe put it back in one visible step.
+        //
+        // Thirty fixed most of that and left the rest, because thirty is the *idle* rate. A moving
+        // cursor drives it to about forty — measured, drawing a slow circle — and any frame past
+        // the declaration is one the budget did not allow for, so the encoder thins them all again
+        // exactly when something is moving. The number has to be what it does under load, not what
+        // it does at rest.
+        format.setInteger(MediaFormat.KEY_FRAME_RATE, 40);
 
         // Variable rate, deliberately. A desktop is still most of the time and constant rate pads
         // a motionless picture up to its quota for no reason, spending on nothing the bandwidth
@@ -131,7 +135,7 @@ public final class Encoder {
         surface = input;
         Ln.i("VIDEO", "Encoder = " + codec.getName() + " (" + mime + ")");
         Ln.i("VIDEO", "Resolution = " + width + "x" + height + ", bitrate = " + bitrate / 1_000_000
-                + " Mb/s at 30, " + (intraRefresh ? "intra refresh" : "keyframes only"));
+                + " Mb/s at 40, " + (intraRefresh ? "intra refresh" : "keyframes only"));
 
         drainThread = new Thread(this::drain, "miniMont-Encoder");
         drainThread.start();

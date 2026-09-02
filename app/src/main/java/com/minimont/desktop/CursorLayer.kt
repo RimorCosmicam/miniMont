@@ -6,14 +6,11 @@ import android.graphics.Color as AndroidColor
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.view.Display
-import android.view.ViewGroup
+import android.view.Gravity
 import android.view.WindowManager
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -30,6 +27,10 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.minimont.DesktopController
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 /**
  * The cursor, drawn by us because nobody else will.
@@ -40,9 +41,15 @@ import com.minimont.DesktopController
  * reaches it. Which is why the desktop answered every click and there was nothing on screen to aim
  * with.
  *
- * So this is a full-screen window over everything, touchable by nobody, drawing one arrow at the
- * position the touchpad has been sending. It cannot drift: the same deltas that move the real
- * pointer move this one, clamped the same way, from the same starting point.
+ * So this is a window over everything, touchable by nobody, drawing one arrow. It cannot drift:
+ * the same deltas that move the real pointer move this one, clamped the same way, from the same
+ * starting point.
+ *
+ * It is the size of the arrow and it *moves*, rather than being a full-screen sheet that redraws an
+ * arrow somewhere new. That is not tidiness, it is the picture quality: a full-screen window
+ * repainting on every motion event hands the compositor the whole display as damaged, and the
+ * encoder then spends a frame's worth of bits re-describing 1600x900 of unchanged desktop instead
+ * of the thirty pixels that actually moved. A cursor should cost what a cursor costs.
  */
 class CursorLayer(
     context: Context,
@@ -64,8 +71,12 @@ class CursorLayer(
 
         window?.apply {
             setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
-            setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            setLayout(SIZE, SIZE)
+            setGravity(Gravity.TOP or Gravity.START)
             clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            // Without this the window is kept inside the display's insets and the pointer stops
+            // short of the edges it is supposed to be able to reach.
+            addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
             // Covers the whole display and must be invisible to every touch and every key, or it
             // would be a sheet of glass over the desktop that swallows the pointer it is drawing.
             addFlags(
@@ -81,17 +92,17 @@ class CursorLayer(
             setViewTreeViewModelStoreOwner(this@CursorLayer)
             setViewTreeSavedStateRegistryOwner(this@CursorLayer)
             setContent {
-                val position by controller.cursor.collectAsState()
+                // Drawn once, at the origin. The arrow never moves inside this window; the window
+                // moves, and nothing is repainted to do it.
                 Canvas(Modifier.fillMaxSize()) {
-                    val (x, y) = position
                     val arrow = Path().apply {
-                        moveTo(x, y)
-                        lineTo(x, y + 19f)
-                        lineTo(x + 4.6f, y + 14.6f)
-                        lineTo(x + 7.8f, y + 22f)
-                        lineTo(x + 11f, y + 20.6f)
-                        lineTo(x + 7.8f, y + 13.4f)
-                        lineTo(x + 13.6f, y + 13.4f)
+                        moveTo(0f, 0f)
+                        lineTo(0f, 19f)
+                        lineTo(4.6f, 14.6f)
+                        lineTo(7.8f, 22f)
+                        lineTo(11f, 20.6f)
+                        lineTo(7.8f, 13.4f)
+                        lineTo(13.6f, 13.4f)
                         close()
                     }
                     // White, with the thinnest possible black keyline. Mont would rather have the
@@ -109,11 +120,35 @@ class CursorLayer(
     override fun onStart() {
         super.onStart()
         registry.currentState = Lifecycle.State.RESUMED
+        // Followed here rather than inside the composition: moving the window is a layout change,
+        // and routing it through Compose would mean recomposing a picture that never changes in
+        // order to put it somewhere else.
+        follow = scope.launch {
+            controller.cursor.collect { (x, y) ->
+                val current = window?.attributes ?: return@collect
+                val left = x.toInt()
+                val top = y.toInt()
+                if (current.x == left && current.y == top) return@collect
+                current.x = left
+                current.y = top
+                window?.attributes = current
+            }
+        }
     }
 
     override fun onStop() {
+        follow?.cancel()
+        follow = null
         registry.currentState = Lifecycle.State.DESTROYED
         store.clear()
         super.onStop()
+    }
+
+    private val scope = CoroutineScope(Dispatchers.Main.immediate)
+    private var follow: Job? = null
+
+    private companion object {
+        /** Big enough for the arrow and nothing else. */
+        const val SIZE = 26
     }
 }
