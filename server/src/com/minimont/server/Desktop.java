@@ -313,6 +313,22 @@ public final class Desktop {
      * These are the two things the desktop actually has a reason to change, and adding a third
      * means adding a line here where it can be seen.
      */
+    /**
+     * Let miniMont bind widgets without a dialog for each one.
+     *
+     * Normally an app either answers a system prompt per widget or holds a signature permission it
+     * cannot be granted. `appwidget grant` is a shell command and miniMont is holding a shell, so
+     * it asks once, at start, and never again.
+     */
+    public static void allowWidgets(String packageName) {
+        // `grantbind`, not `grant`: the verb is spelled differently from every other shell
+        // command that hands out a permission, and the wrong one fails with "Unsupported
+        // operation" rather than with anything that names the right one.
+        String output = run("appwidget grantbind --package " + packageName);
+        Ln.i("DESKTOP", "widget binding for " + packageName
+                + (output.isBlank() ? " granted" : ": " + output.trim()));
+    }
+
     public static void wifi(boolean on) {
         run("svc wifi " + (on ? "enable" : "disable"));
         Ln.i("DESKTOP", "wifi " + (on ? "on" : "off"));

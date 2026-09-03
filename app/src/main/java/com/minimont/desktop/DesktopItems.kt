@@ -1,0 +1,238 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+
+package com.minimont.desktop
+
+import android.appwidget.AppWidgetHost
+import android.appwidget.AppWidgetHostView
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
+import android.content.Context
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import com.minimont.DesktopController
+import com.minimont.ui.mont.MontLabel
+import com.minimont.ui.mont.MontRow
+import com.minimont.ui.mont.MontSurface
+import com.minimont.ui.mont.MontWhite
+
+/** How big a desktop icon is, and how much room its name gets under it. */
+private const val ICON = 48
+private const val LABEL = 92
+
+/**
+ * Everything sitting on the desktop: shortcuts and widgets.
+ *
+ * Drawn into the backdrop, which is the bottom of the window stack — so these live *under* every
+ * application window, which is what a desktop is. Nothing here floats above anything.
+ *
+ * Positions are absolute and in dp. Dragging writes the new one down as soon as the finger lifts,
+ * not on every frame: a desktop that saves sixty times a second while you move an icon is a desktop
+ * writing to storage sixty times a second.
+ */
+@Composable
+fun DesktopItems(
+    items: List<DesktopStore.Item>,
+    host: AppWidgetHost?,
+    onOpen: (String) -> Unit
+) {
+    val density = LocalDensity.current
+    var menuFor by remember { mutableStateOf<DesktopStore.Item?>(null) }
+
+    Box(Modifier.fillMaxSize()) {
+        items.forEach { item ->
+            var dragX by remember(item.id) { mutableStateOf(item.x.toFloat()) }
+            var dragY by remember(item.id) { mutableStateOf(item.y.toFloat()) }
+
+            Box(
+                Modifier
+                    .offset { IntOffset(with(density) { dragX.dp.roundToPx() }, with(density) { dragY.dp.roundToPx() }) }
+                    .pointerInput(item.id) {
+                        detectDragGestures(
+                            onDrag = { change, dragged ->
+                                change.consume()
+                                dragX += with(density) { dragged.x.toDp().value }
+                                dragY += with(density) { dragged.y.toDp().value }
+                            },
+                            // Written down once the finger lifts. Sixty writes a second while
+                            // somebody moves an icon is sixty writes a second to storage.
+                            onDragEnd = {
+                                DesktopStore.moveItem(item.id, dragX.toInt(), dragY.toInt())
+                            }
+                        )
+                    }
+            ) {
+                when (item.kind) {
+                    DesktopStore.Kind.APP -> Shortcut(
+                        item = item,
+                        onOpen = { onOpen(item.component) },
+                        onHold = { menuFor = item }
+                    )
+
+                    DesktopStore.Kind.WIDGET -> Widget(
+                        item = item,
+                        host = host,
+                        onHold = { menuFor = item }
+                    )
+                }
+            }
+        }
+
+        menuFor?.let { item ->
+            Box(
+                Modifier
+                    .offset {
+                        IntOffset(
+                            with(density) { item.x.dp.roundToPx() },
+                            with(density) { (item.y + ICON + 12).dp.roundToPx() }
+                        )
+                    }
+                    .background(MontSurface)
+                    .width(200.dp)
+            ) {
+                Column(Modifier.padding(start = 14.dp, top = 8.dp, end = 10.dp, bottom = 8.dp)) {
+                    MontRow(label = "Remove from the desktop") {
+                        if (item.kind == DesktopStore.Kind.WIDGET && item.widgetId != 0) {
+                            runCatching { host?.deleteAppWidgetId(item.widgetId) }
+                        }
+                        DesktopStore.removeItem(item.id)
+                        menuFor = null
+                    }
+                    MontRow(label = "Cancel", active = false) { menuFor = null }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Shortcut(item: DesktopStore.Item, onOpen: () -> Unit, onHold: () -> Unit) {
+    val context = LocalContext.current
+    val app = remember(item.component) {
+        AppCatalog.byPackage(context, item.component.substringBefore('/'))
+    }
+
+    Column(
+        Modifier
+            .width(LABEL.dp)
+            .combinedClickable(onClick = onOpen, onLongClick = onHold),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        val icon = app?.icon
+        if (icon != null) {
+            Image(icon, contentDescription = app.label, modifier = Modifier.size(ICON.dp))
+        } else {
+            Box(Modifier.size(ICON.dp).background(Color.White.copy(alpha = MontWhite.TRACK)))
+        }
+        Spacer(Modifier.height(4.dp))
+        // Named in white on whatever the wallpaper happens to be, which is the one place in
+        // miniMont where type sits on a picture rather than on Mont's black.
+        MontLabel(app?.label.orEmpty(), size = 11, alpha = MontWhite.PRIMARY)
+    }
+}
+
+/**
+ * A widget, hosted.
+ *
+ * The provider draws it; miniMont gives it a rectangle and stays out of it. Held in an AndroidView
+ * because an app widget is a RemoteViews hierarchy inflated by the framework, and there is no
+ * Compose equivalent of that and never will be.
+ */
+@Composable
+private fun Widget(item: DesktopStore.Item, host: AppWidgetHost?, onHold: () -> Unit) {
+    val context = LocalContext.current
+
+    Box(
+        Modifier
+            .size(item.width.dp, item.height.dp)
+            .combinedClickable(onClick = {}, onLongClick = onHold)
+    ) {
+        if (host == null || item.widgetId == 0) {
+            Box(Modifier.fillMaxSize().background(MontSurface)) {
+                MontLabel("WIDGET", Modifier.align(Alignment.Center), alpha = MontWhite.DIM, size = 11)
+            }
+            return@Box
+        }
+        AndroidView(
+            factory = { viewContext ->
+                val manager = AppWidgetManager.getInstance(viewContext)
+                val info = manager.getAppWidgetInfo(item.widgetId)
+                host.createView(viewContext, item.widgetId, info) as AppWidgetHostView
+            },
+            modifier = Modifier.fillMaxSize(),
+            update = { view ->
+                view.updateAppWidgetSize(null, item.width, item.height, item.width, item.height)
+            }
+        )
+    }
+}
+
+/**
+ * Binding a widget without asking, because the shell already said yes.
+ *
+ * Normally an app needs the user to answer a system dialog for every widget it binds, or hold a
+ * signature permission it cannot be granted. miniMont has a third way: `appwidget grant` is a shell
+ * command, and miniMont is holding a shell. The grant happens once, at the host's start.
+ */
+object Widgets {
+    const val HOST_ID = 0x4D4F
+
+    fun providers(context: Context): List<AppWidgetProviderEntry> = runCatching {
+        AppWidgetManager.getInstance(context).installedProviders.map { info ->
+            AppWidgetProviderEntry(
+                label = info.loadLabel(context.packageManager),
+                provider = info.provider,
+                width = (info.minWidth / context.resources.displayMetrics.density).toInt().coerceIn(80, 400),
+                height = (info.minHeight / context.resources.displayMetrics.density).toInt().coerceIn(60, 400)
+            )
+        }.sortedBy { it.label.lowercase() }
+    }.getOrDefault(emptyList())
+
+    /**
+     * Allocate an id and bind it to a provider.
+     *
+     * Returns zero when the bind is refused, which means the shell grant has not happened yet —
+     * the id is handed straight back rather than left allocated to nothing.
+     */
+    fun bind(context: Context, host: AppWidgetHost, provider: ComponentName): Int {
+        val manager = AppWidgetManager.getInstance(context)
+        val id = host.allocateAppWidgetId()
+        val bound = runCatching { manager.bindAppWidgetIdIfAllowed(id, provider) }.getOrDefault(false)
+        if (!bound) {
+            runCatching { host.deleteAppWidgetId(id) }
+            return 0
+        }
+        return id
+    }
+}
+
+data class AppWidgetProviderEntry(
+    val label: String,
+    val provider: ComponentName,
+    val width: Int,
+    val height: Int
+)

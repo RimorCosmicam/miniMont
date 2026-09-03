@@ -441,6 +441,7 @@ public final class Server {
             // the first window opened before the chrome had attached was placed nowhere and kept
             // whatever size the app chose for itself — which for Chrome is a phone.
             Desktop.setArea(8, 8, width - 8, height - 8);
+            Desktop.allowWidgets(OURS);
             if (!backdrop.isEmpty() && !Desktop.backdrop(display.id(), backdrop)) {
                 // The one failure that must never be a black screen with no explanation. A display
                 // without system decorations that will not take an activity is the project's

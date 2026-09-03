@@ -1,5 +1,6 @@
 package com.minimont.desktop
 
+import android.appwidget.AppWidgetHost
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
@@ -23,6 +24,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import com.minimont.R
+import com.minimont.DesktopController
 import com.minimont.ui.mont.MontAccent
 
 /**
@@ -38,12 +40,30 @@ import com.minimont.ui.mont.MontAccent
  */
 class DesktopActivity : ComponentActivity() {
 
+    private var host: AppWidgetHost? = null
+
+    override fun onDestroy() {
+        runCatching { host?.stopListening() }
+        host = null
+        super.onDestroy()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         DesktopStore.load(this)
+        // The widget host lives with the backdrop, because the backdrop is what widgets are drawn
+        // on and its lifetime is theirs: started when the desktop appears, stopped when it goes.
+        host = AppWidgetHost(this, Widgets.HOST_ID)
+        runCatching { host?.startListening() }
+
         setContent {
             val state by DesktopStore.state.collectAsState()
-            Backdrop(state)
+            Box(Modifier.fillMaxSize()) {
+                Backdrop(state)
+                DesktopItems(state.items, host) { component ->
+                    DesktopController.of(this@DesktopActivity).launch(component)
+                }
+            }
         }
     }
 }

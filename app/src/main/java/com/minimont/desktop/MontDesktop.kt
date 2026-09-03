@@ -522,6 +522,7 @@ private fun GridRow(
 /** The categories down the left of the settings card. */
 private enum class Section(val label: String) {
     WALLPAPER("Wallpaper"),
+    DESKTOP("Desktop"),
     TASKBAR("Taskbar"),
     DRAWER("App drawer"),
     STATUS("Status")
@@ -567,6 +568,7 @@ private fun SettingsCard(
             Column(Modifier.weight(1f)) {
                 when (section) {
                     Section.WALLPAPER -> WallpaperSection(state, onPickImage)
+                    Section.DESKTOP -> DesktopSection(state)
                     Section.TASKBAR -> TaskbarSection(state)
                     Section.DRAWER -> DrawerSection(state)
                     Section.STATUS -> StatusSection(notifications, onGrantNotifications)
@@ -600,6 +602,71 @@ private fun WallpaperSection(state: DesktopStore.State, onPickImage: () -> Unit)
             ) { DesktopStore.setBackdrop(backdrop) }
         }
     }
+}
+
+/**
+ * What is on the desktop, and how to put something else there.
+ *
+ * Widgets are listed by what they are rather than by which app provides them, because that is how
+ * anybody looks for one. Each arrives at the size its provider says it wants, in the top left, and
+ * is dragged from there — miniMont does not guess where somebody wanted it.
+ */
+@Composable
+private fun DesktopSection(state: DesktopStore.State) {
+    val context = LocalContext.current
+    val scale = LocalMontScale.current
+    var adding by remember { mutableStateOf(false) }
+    val providers = remember(adding) { if (adding) Widgets.providers(context) else emptyList() }
+
+    MontDetail(
+        when (state.items.size) {
+            0 -> "Nothing on the desktop."
+            1 -> "One thing on the desktop."
+            else -> "${state.items.size} things on the desktop."
+        }
+    )
+    Spacer(Modifier.height(10.dp * scale))
+
+    if (!adding) {
+        MontRow(label = "Add a widget") { adding = true }
+        if (state.items.isNotEmpty()) {
+            MontRow(label = "Clear the desktop", active = false) {
+                state.items.forEach { DesktopStore.removeItem(it.id) }
+            }
+        }
+        Spacer(Modifier.height(8.dp * scale))
+        MontDetail("Applications are added from the app list, and dragged wherever you want them.")
+        return
+    }
+
+    MontLabel("WIDGETS", size = 11, alpha = MontWhite.DETAIL)
+    Spacer(Modifier.height(6.dp * scale))
+    if (providers.isEmpty()) MontDetail("Nothing installed offers one.")
+    providers.forEach { provider ->
+        MontRow(label = provider.label) {
+            // Bound here rather than when it is drawn: a widget that cannot be bound should fail
+            // in a list somebody is reading, not as an empty rectangle on the desktop later.
+            val host = android.appwidget.AppWidgetHost(context, Widgets.HOST_ID)
+            val id = Widgets.bind(context, host, provider.provider)
+            if (id != 0) {
+                DesktopStore.addItem(
+                    DesktopStore.Item(
+                        id = "w" + System.currentTimeMillis(),
+                        kind = DesktopStore.Kind.WIDGET,
+                        component = provider.provider.flattenToShortString(),
+                        x = 40,
+                        y = 40,
+                        width = provider.width,
+                        height = provider.height,
+                        widgetId = id
+                    )
+                )
+            }
+            adding = false
+        }
+    }
+    Spacer(Modifier.height(8.dp * scale))
+    MontRow(label = "Cancel", active = false) { adding = false }
 }
 
 /**
@@ -712,6 +779,18 @@ private fun ItemCard(
             onDismiss()
         }
         MontRow(label = "App info") { onInfo() }
+        MontRow(label = "Add to the desktop") {
+            DesktopStore.addItem(
+                DesktopStore.Item(
+                    id = "a" + System.currentTimeMillis(),
+                    kind = DesktopStore.Kind.APP,
+                    component = app.component,
+                    x = 40,
+                    y = 40
+                )
+            )
+            onDismiss()
+        }
         // The window that needs this most is the one whose corners are already off the screen, and
         // that is exactly the window you cannot drag back.
         MontRow(label = "Fit to the screen", enabled = open) { onFit() }

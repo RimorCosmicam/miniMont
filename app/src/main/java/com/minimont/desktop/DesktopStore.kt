@@ -50,6 +50,52 @@ object DesktopStore {
         LARGE("Large", 30, 7, 16, 10)
     }
 
+    /** What can sit on the desktop itself. */
+    enum class Kind { APP, WIDGET }
+
+    /**
+     * One thing on the desktop, and where it is.
+     *
+     * Positions are in the display's own dp and are absolute, not a cell in a grid: a desktop where
+     * everything snaps to a lattice is a desktop that rearranges itself when the resolution
+     * changes, and the whole point of putting something somewhere is that it stays there.
+     */
+    data class Item(
+        val id: String,
+        val kind: Kind,
+        /** `package/class` for an app, the provider's component for a widget. */
+        val component: String,
+        val x: Int,
+        val y: Int,
+        /** Widgets only; an icon is whatever size an icon is. */
+        val width: Int = 180,
+        val height: Int = 110,
+        /** Widgets only: the id the host allocated for this one. */
+        val widgetId: Int = 0
+    ) {
+        fun encode(): String = listOf(id, kind.name, component, x, y, width, height, widgetId)
+            .joinToString("\u0001")
+
+        companion object {
+            fun decode(line: String): Item? {
+                val parts = line.split("\u0001")
+                if (parts.size < 8) return null
+                return runCatching {
+                    Item(
+                        id = parts[0],
+                        kind = Kind.valueOf(parts[1]),
+                        component = parts[2],
+                        x = parts[3].toInt(),
+                        y = parts[4].toInt(),
+                        width = parts[5].toInt(),
+                        height = parts[6].toInt(),
+                        widgetId = parts[7].toInt()
+                    )
+                }.getOrNull()
+            }
+        }
+    }
+
     data class State(
         val backdrop: Backdrop = Backdrop.MONT,
         /** The chosen picture, if there is one. Held even while another backdrop is showing. */
@@ -77,7 +123,9 @@ object DesktopStore {
          * was given, which is why the column setting goes quiet while it is on.
          */
         val superFill: Boolean = false,
-        val thickness: Thickness = Thickness.REGULAR
+        val thickness: Thickness = Thickness.REGULAR,
+        /** What is on the desktop: shortcuts and widgets, in the order they were put there. */
+        val items: List<Item> = emptyList()
     )
 
     private val _state = MutableStateFlow(State())
@@ -105,7 +153,9 @@ object DesktopStore {
             superFill = preferences.getBoolean(SUPER_FILL, false),
             thickness = runCatching {
                 Thickness.valueOf(preferences.getString(THICKNESS, null) ?: Thickness.REGULAR.name)
-            }.getOrDefault(Thickness.REGULAR)
+            }.getOrDefault(Thickness.REGULAR),
+            items = preferences.getString(ITEMS, "").orEmpty()
+                .split("\n").mapNotNull { Item.decode(it) }
         )
     }
 
@@ -185,6 +235,41 @@ object DesktopStore {
         preferences.edit().putString(THICKNESS, thickness.name).apply()
     }
 
+    /** Put something on the desktop, where it was dropped. */
+    fun addItem(item: Item) {
+        _state.update { it.copy(items = it.items + item) }
+        writeItems()
+    }
+
+    fun moveItem(id: String, x: Int, y: Int) {
+        _state.update { current ->
+            current.copy(items = current.items.map { if (it.id == id) it.copy(x = x, y = y) else it })
+        }
+        writeItems()
+    }
+
+    fun resizeItem(id: String, width: Int, height: Int) {
+        _state.update { current ->
+            current.copy(
+                items = current.items.map {
+                    if (it.id == id) it.copy(width = width, height = height) else it
+                }
+            )
+        }
+        writeItems()
+    }
+
+    fun removeItem(id: String) {
+        _state.update { current -> current.copy(items = current.items.filterNot { it.id == id }) }
+        writeItems()
+    }
+
+    private fun writeItems() {
+        preferences.edit()
+            .putString(ITEMS, _state.value.items.joinToString("\n") { it.encode() })
+            .apply()
+    }
+
     private const val FILE = "minimont"
     private const val BACKDROP = "wallpaper"
     private const val IMAGE = "wallpaper_image"
@@ -196,4 +281,5 @@ object DesktopStore {
     private const val SUPER_FILL = "super_fill"
     private const val THICKNESS = "thickness"
     private const val MIGRATED = "mont_wallpaper_migrated"
+    private const val ITEMS = "desktop_items"
 }
