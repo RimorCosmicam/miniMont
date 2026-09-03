@@ -318,11 +318,23 @@ public final class Server {
                 String[] parts = argument.split(" ");
                 int button = Integer.parseInt(parts[0]);
                 boolean down = "1".equals(parts[1]);
-                if (button == 1) {
-                    if (down) rememberDrag();
-                    else snapIfDragged();
-                }
+                float x = pointer.x();
+                float y = pointer.y();
+
+                // The button first, always, and nothing between the press arriving and the press
+                // being sent.
+                //
+                // Snapping used to run in this gap. It reads the task list by reflection and can
+                // end in a process spawn, so a release could be delayed by hundreds of
+                // milliseconds — and if anything in it threw, the release was never sent at all and
+                // the button stayed down for good. Nothing clicked again, which is a long way from
+                // "the snap did not work".
                 pointer.button(button, down);
+
+                if (button == 1) {
+                    if (down) session.execute(() -> rememberDrag(x, y));
+                    else session.execute(() -> snapIfDragged(x, y));
+                }
                 break;
             }
             case "w": {
@@ -376,18 +388,22 @@ public final class Server {
     private int dragTask = -1;
     private int[] dragBounds;
 
-    private void rememberDrag() {
+    private void rememberDrag(float pressX, float pressY) {
         dragTask = -1;
         dragBounds = null;
-        if (display == null || pointer == null) return;
-        int x = (int) pointer.x();
-        int y = (int) pointer.y();
-        for (int[] window : Tasks.windows(display.id(), OURS)) {
-            if (x >= window[1] && x <= window[3] && y >= window[2] && y <= window[4]) {
-                dragTask = window[0];
-                dragBounds = new int[] { window[1], window[2], window[3], window[4] };
-                return;
+        if (display == null) return;
+        try {
+            int x = (int) pressX;
+            int y = (int) pressY;
+            for (int[] window : Tasks.windows(display.id(), OURS)) {
+                if (x >= window[1] && x <= window[3] && y >= window[2] && y <= window[4]) {
+                    dragTask = window[0];
+                    dragBounds = new int[] { window[1], window[2], window[3], window[4] };
+                    return;
+                }
             }
+        } catch (Throwable failure) {
+            Ln.e("DESKTOP", "could not note what was under the press", failure);
         }
     }
 
@@ -399,26 +415,30 @@ public final class Server {
      * pointer to finish at an edge is what makes it a deliberate gesture rather than an accident of
      * where somebody let go.
      */
-    private void snapIfDragged() {
-        if (display == null || pointer == null || dragTask < 0 || dragBounds == null) return;
+    private void snapIfDragged(float releaseX, float releaseY) {
+        if (display == null || dragTask < 0 || dragBounds == null) return;
         int task = dragTask;
         int[] before = dragBounds;
         dragTask = -1;
         dragBounds = null;
 
-        boolean moved = false;
-        for (int[] window : Tasks.windows(display.id(), OURS)) {
-            if (window[0] != task) continue;
-            moved = window[1] != before[0] || window[2] != before[1];
-            break;
-        }
-        if (!moved) return;
+        try {
+            boolean moved = false;
+            for (int[] window : Tasks.windows(display.id(), OURS)) {
+                if (window[0] != task) continue;
+                moved = window[1] != before[0] || window[2] != before[1];
+                break;
+            }
+            if (!moved) return;
 
-        int x = (int) pointer.x();
-        int y = (int) pointer.y();
-        if (y <= EDGE) Desktop.arrange(task, "fill");
-        else if (x <= EDGE) Desktop.arrange(task, "left");
-        else if (x >= width - EDGE) Desktop.arrange(task, "right");
+            int x = (int) releaseX;
+            int y = (int) releaseY;
+            if (y <= EDGE) Desktop.arrange(task, "fill");
+            else if (x <= EDGE) Desktop.arrange(task, "left");
+            else if (x >= width - EDGE) Desktop.arrange(task, "right");
+        } catch (Throwable failure) {
+            Ln.e("DESKTOP", "could not snap task " + task, failure);
+        }
     }
 
     /** How close to an edge counts as being at it. */
