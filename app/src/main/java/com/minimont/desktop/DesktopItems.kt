@@ -34,9 +34,11 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import androidx.compose.ui.viewinterop.AndroidView
 import com.minimont.DesktopController
 import com.minimont.ui.mont.MontLabel
@@ -47,6 +49,41 @@ import com.minimont.ui.mont.MontWhite
 /** How big a desktop icon is, and how much room its name gets under it. */
 private const val ICON = 48
 private const val LABEL = 92
+
+/**
+ * The desktop's grid, the way a launcher has one.
+ *
+ * A cell is an icon and the air around it. The margin is an icon and a half from the left, the
+ * right and the top — which works out to exactly one cell, so the first column starts one cell in
+ * and everything lines up with everything else without a second number being involved.
+ *
+ * Positions are still stored in dp rather than as row and column. The grid is where things land,
+ * not what they are: a desktop that stores coordinates in cells forgets where anything was the
+ * moment the resolution changes, and this way a wrong cell size costs alignment rather than layout.
+ */
+private object Grid {
+    const val CELL = 72
+    const val MARGIN = (ICON * 3) / 2
+
+    fun snap(value: Float, limit: Int): Int {
+        val cells = ((value - MARGIN) / CELL).roundToInt().coerceAtLeast(0)
+        return (MARGIN + cells * CELL).coerceIn(MARGIN, maxOf(MARGIN, limit))
+    }
+
+    /** The first cell nothing is standing in, so two things added in a row do not land on top. */
+    fun free(taken: List<DesktopStore.Item>, width: Int, height: Int): Pair<Int, Int> {
+        val columns = ((width - MARGIN * 2) / CELL).coerceAtLeast(1)
+        val rows = ((height - MARGIN * 2) / CELL).coerceAtLeast(1)
+        for (row in 0 until rows) {
+            for (column in 0 until columns) {
+                val x = MARGIN + column * CELL
+                val y = MARGIN + row * CELL
+                if (taken.none { it.x == x && it.y == y }) return x to y
+            }
+        }
+        return MARGIN to MARGIN
+    }
+}
 
 /**
  * Everything sitting on the desktop: shortcuts and widgets.
@@ -65,6 +102,8 @@ fun DesktopItems(
     onOpen: (String) -> Unit
 ) {
     val density = LocalDensity.current
+    val configuration = LocalConfiguration.current
+    val screen = configuration.screenWidthDp to configuration.screenHeightDp
     var menuFor by remember { mutableStateOf<DesktopStore.Item?>(null) }
 
     var deskMenu by remember { mutableStateOf<Offset?>(null) }
@@ -102,7 +141,11 @@ fun DesktopItems(
                             },
                             // Written down once the finger lifts. Sixty writes a second while
                             // somebody moves an icon is sixty writes a second to storage.
+                            // Snapped when the finger lifts rather than while it moves: an icon
+                            // that jumps between cells under the pointer is an icon fighting you.
                             onDragEnd = {
+                                dragX = Grid.snap(dragX, screen.first - Grid.CELL).toFloat()
+                                dragY = Grid.snap(dragY, screen.second - Grid.CELL).toFloat()
                                 DesktopStore.moveItem(item.id, dragX.toInt(), dragY.toInt())
                             }
                         )
@@ -251,7 +294,13 @@ private fun Widget(item: DesktopStore.Item, host: AppWidgetHost?, onHold: () -> 
                             height = (height + with(density) { dragged.y.toDp().value })
                                 .coerceIn(72f, 720f)
                         },
+                        // Widgets snap to whole cells too, so a row of them lines up even when
+                        // each was dragged to a different size by hand.
                         onDragEnd = {
+                            width = (Math.round(width / Grid.CELL).coerceAtLeast(1) * Grid.CELL)
+                                .toFloat()
+                            height = (Math.round(height / Grid.CELL).coerceAtLeast(1) * Grid.CELL)
+                                .toFloat()
                             DesktopStore.resizeItem(item.id, width.toInt(), height.toInt())
                         }
                     )

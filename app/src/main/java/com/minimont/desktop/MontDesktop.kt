@@ -705,13 +705,14 @@ private fun add(context: android.content.Context, provider: AppWidgetProviderEnt
     val host = android.appwidget.AppWidgetHost(context, Widgets.HOST_ID)
     val id = Widgets.bind(context, host, provider.provider)
     if (id == 0) return
+    val where = DesktopStore.nextCell()
     DesktopStore.addItem(
         DesktopStore.Item(
             id = "w" + System.currentTimeMillis(),
             kind = DesktopStore.Kind.WIDGET,
             component = provider.provider.flattenToShortString(),
-            x = 40,
-            y = 40,
+            x = where.first,
+            y = where.second,
             width = provider.width,
             height = provider.height,
             widgetId = id
@@ -830,13 +831,14 @@ private fun ItemCard(
         }
         MontRow(label = "App info") { onInfo() }
         MontRow(label = "Add to the desktop") {
+            val where = DesktopStore.nextCell()
             DesktopStore.addItem(
                 DesktopStore.Item(
                     id = "a" + System.currentTimeMillis(),
                     kind = DesktopStore.Kind.APP,
                     component = app.component,
-                    x = 40,
-                    y = 40
+                    x = where.first,
+                    y = where.second
                 )
             )
             onDismiss()

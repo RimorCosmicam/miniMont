@@ -235,6 +235,27 @@ object DesktopStore {
         preferences.edit().putString(THICKNESS, thickness.name).apply()
     }
 
+    /**
+     * The next free cell, so two things added one after the other do not land on top of each other.
+     *
+     * The grid's own figures, duplicated here rather than reached for: this is asked from the
+     * settings card, which is drawn in a different window from the desktop and has no business
+     * knowing how the desktop lays itself out beyond where the next thing goes.
+     */
+    fun nextCell(): Pair<Int, Int> {
+        val margin = 72
+        val cell = 72
+        val taken = _state.value.items
+        for (row in 0 until 12) {
+            for (column in 0 until 12) {
+                val x = margin + column * cell
+                val y = margin + row * cell
+                if (taken.none { it.x == x && it.y == y }) return x to y
+            }
+        }
+        return margin to margin
+    }
+
     /** Put something on the desktop, where it was dropped. */
     fun addItem(item: Item) {
         _state.update { it.copy(items = it.items + item) }
