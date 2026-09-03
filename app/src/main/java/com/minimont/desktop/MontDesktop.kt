@@ -123,7 +123,12 @@ fun MontDesktop(
     onOpenPhone: (String) -> Unit,
     onArrangeWindow: (String, String) -> Unit,
     onBack: () -> Unit,
-    onHome: () -> Unit
+    onHome: () -> Unit,
+    desktops: List<List<String>>,
+    desktop: Int,
+    onShowDesktop: (Int) -> Unit,
+    onAddDesktop: () -> Unit,
+    onRemoveDesktop: (Int) -> Unit
 ) {
     val context = LocalContext.current
     val store by DesktopStore.state.collectAsState()
@@ -258,13 +263,16 @@ fun MontDesktop(
 
             Panel.WIDGETS -> WidgetPicker { panel = Panel.NONE }
 
-            Panel.WINDOWS -> WindowsCard(
-                apps = apps.filter { it.packageName in running },
-                onFocus = { app ->
+            Panel.WINDOWS -> DesktopsCard(
+                desktops = desktops,
+                current = desktop,
+                apps = apps,
+                onShow = { index ->
                     panel = Panel.NONE
-                    onLaunch(app.component)
+                    onShowDesktop(index)
                 },
-                onClose = { app -> onClose(app.packageName) },
+                onAdd = onAddDesktop,
+                onRemove = onRemoveDesktop,
                 onDismiss = { panel = Panel.NONE }
             )
 
@@ -1274,6 +1282,98 @@ private fun BatteryMark(level: Int, colour: Color, modifier: Modifier = Modifier
             Offset(body + 1f, size.height * .3f),
             Size(cap, size.height * .4f)
         )
+    }
+}
+
+/**
+ * The desktops, as a grid of what is on each.
+ *
+ * This is what the recents mark opens. A list of open windows was already the taskbar's job and
+ * telling you twice is not a feature — where those windows *are* is the thing nothing else says.
+ *
+ * Each desktop is a rectangle holding the icons of what is standing on it: empty ones look empty,
+ * busy ones look busy, and you pick by shape rather than by reading a number. The one you are on is
+ * the bright one, which is the rule everything else here follows.
+ */
+@Composable
+private fun DesktopsCard(
+    desktops: List<List<String>>,
+    current: Int,
+    apps: List<DesktopApp>,
+    onShow: (Int) -> Unit,
+    onAdd: () -> Unit,
+    onRemove: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val scale = LocalMontScale.current
+    val byPackage = remember(apps) { apps.associateBy { it.packageName } }
+
+    DesktopCard(width = 520, maxHeight = 400) {
+        MontLabel("DESKTOPS", size = 16, alpha = MontWhite.PRIMARY)
+        Spacer(Modifier.height(10.dp * scale))
+
+        desktops.chunked(3).forEachIndexed { rowIndex, row ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 5.dp * scale)) {
+                row.forEachIndexed { columnIndex, packages ->
+                    val index = rowIndex * 3 + columnIndex
+                    Column(
+                        Modifier
+                            .weight(1f)
+                            .padding(horizontal = 4.dp * scale)
+                    ) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(74.dp * scale)
+                                .background(
+                                    Color.White.copy(
+                                        alpha = if (index == current) .22f else MontWhite.TRACK
+                                    )
+                                )
+                                .combinedClickable { onShow(index) }
+                                .padding(6.dp * scale)
+                        ) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp * scale)) {
+                                packages.take(5).forEach { name ->
+                                    byPackage[name]?.icon?.let { icon ->
+                                        Image(
+                                            icon,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp * scale)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(3.dp * scale))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            MontLabel(
+                                "${index + 1}",
+                                Modifier.weight(1f),
+                                size = 11,
+                                alpha = if (index == current) MontWhite.ACTIVE else MontWhite.DIM
+                            )
+                            // The first desktop has no X: something has to be left to come back to.
+                            if (index > 0) {
+                                MontLabel(
+                                    "X",
+                                    Modifier
+                                        .padding(horizontal = 6.dp * scale, vertical = 3.dp * scale)
+                                        .combinedClickable { onRemove(index) },
+                                    size = 11,
+                                    alpha = MontWhite.DIM
+                                )
+                            }
+                        }
+                    }
+                }
+                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+
+        Spacer(Modifier.height(10.dp * scale))
+        MontRow(label = "Add a desktop") { onAdd() }
+        MontRow(label = "Close", active = false) { onDismiss() }
     }
 }
 

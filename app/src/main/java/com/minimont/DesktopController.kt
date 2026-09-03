@@ -73,7 +73,10 @@ data class DesktopState(
      * Not `running`: that word is already taken here by whether the desktop itself is up, and the
      * two are different questions with the same answer often enough to be worth keeping apart.
      */
-    val openApps: List<String> = emptyList()
+    val openApps: List<String> = emptyList(),
+    /** What is on each virtual desktop, in order, and which one is showing. */
+    val desktops: List<List<String>> = listOf(emptyList()),
+    val desktop: Int = 0
 ) {
     /** The sizes worth offering: the ordinary ones, minus anything past the client's decoder. */
     val choices: List<Pair<Int, Int>>
@@ -303,6 +306,20 @@ class DesktopController private constructor(private val context: Context) {
                                     "Try it with One UI's own decorations switched on."
                             )
                         }
+                        line.startsWith("[EVENT] desks") -> {
+                            val rest = line.substringAfter("desks").trim()
+                            val current = rest.substringBefore(' ').toIntOrNull() ?: 0
+                            val fields = rest.substringAfter(' ', "").split('|')
+                            _state.update { state ->
+                                state.copy(
+                                    desktop = current,
+                                    desktops = fields.map { field ->
+                                        field.split(',').filter { it.isNotBlank() }
+                                    }
+                                )
+                            }
+                        }
+
                         line.startsWith("[EVENT] running") -> {
                             val packages = line.substringAfter("running").trim()
                                 .split(',').filter { it.isNotBlank() }
@@ -426,6 +443,13 @@ class DesktopController private constructor(private val context: Context) {
      */
     fun setArea(left: Int, top: Int, right: Int, bottom: Int) =
         send("area $left $top $right $bottom")
+
+    /** Virtual desktops: show one, make one, take one away. */
+    fun showDesktop(index: Int) = send("desk show $index")
+
+    fun addDesktop() = send("desk add")
+
+    fun removeDesktop(index: Int) = send("desk remove $index")
 
     /** Put an application's window in one of the regions: filled, a half, or a quarter. */
     fun arrange(packageName: String, where: String) = send("arrange $packageName $where")

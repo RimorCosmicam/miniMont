@@ -61,6 +61,7 @@ public final class Server {
     private Input input;
     /** Read by the control thread and written by the session thread, so it is read as it is. */
     private volatile Pointer pointer;
+    private Desktops desks;
 
     private int width;
     private int height;
@@ -269,6 +270,18 @@ public final class Server {
                 announce(true);
                 break;
             }
+            case "desk": {
+                if (desks == null) return;
+                String[] parts = argument.split(" ");
+                switch (parts[0]) {
+                    case "add": desks.add(); break;
+                    case "remove": desks.remove(Integer.parseInt(parts[1])); break;
+                    case "show": desks.switchTo(Integer.parseInt(parts[1])); break;
+                    default: break;
+                }
+                announce(true);
+                break;
+            }
             case "arrange": {
                 int gap = argument.indexOf(' ');
                 if (gap < 0) return;
@@ -384,6 +397,10 @@ public final class Server {
         if (!force && shown.equals(reported)) return;
         reported = shown;
         Ln.i("EVENT", "running " + String.join(",", shown));
+        // Which desktop is showing, how many there are, and what is on each.
+        if (desks != null) {
+            Ln.i("EVENT", "desks " + desks.current() + " " + desks.describe());
+        }
     }
 
     /**
@@ -539,6 +556,8 @@ public final class Server {
             if (freeform) display.enableFreeform();
             input = new Input(display.id(), width, height);
             pointer = new Pointer(display.id(), width, height);
+            if (desks == null) desks = new Desktops(width, height, dpi, OURS);
+            desks.onDisplay(display.id());
             if (!pointer.ready()) {
                 Ln.i("HOST", "POINTER FAILED — the cover screen will not be able to drive this");
             }
@@ -568,6 +587,7 @@ public final class Server {
         // Torn down in the order things depend on each other: the display draws into the encoder's
         // surface, so the display goes first or the encoder is released underneath a live producer.
         if (input != null) { input.close(); input = null; }
+        if (desks != null) desks.release();
         pointer = null;
         if (display != null) { display.release(); display = null; }
         if (repeater != null) { repeater.close(); repeater = null; }

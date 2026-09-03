@@ -49,6 +49,18 @@ public final class MontDisplay {
     }
 
     /**
+     * A display with nowhere to draw, for windows that are not being looked at.
+     *
+     * A virtual desktop is a display like any other, of exactly the same size and density as the
+     * real one — that is the whole point, because a task moved between displays of different
+     * geometry is reconfigured, and an app that relayouts every time you change desktop is an app
+     * that loses its place. It simply has no surface, so nothing composites and nothing encodes.
+     */
+    public static MontDisplay parked(String name, int width, int height, int dpi) throws Exception {
+        return create(name, width, height, dpi, null, 0, false);
+    }
+
+    /**
      * @param flagOverride the exact flag word to use, or zero to work one out.
      *
      * The override exists because these flags are the only lever we have over what One UI decides to

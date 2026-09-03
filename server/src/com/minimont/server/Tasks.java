@@ -72,6 +72,38 @@ public final class Tasks {
         return out;
     }
 
+    /**
+     * Every root task on a display, whatever state it is in.
+     *
+     * Unlike the window list this does not skip tasks with no bounds, because a task parked on a
+     * display with no surface may report none — and those are exactly the ones a desktop switch has
+     * to find and bring back.
+     */
+    public static java.util.List<int[]> tasksOn(int displayId, String exclude) {
+        java.util.List<int[]> out = new ArrayList<>();
+        for (Object task : rootTasks()) {
+            Integer display = number(task, "displayId");
+            Integer id = number(task, "taskId");
+            if (display == null || id == null || display != displayId) continue;
+            String name = packageOf(task);
+            if (name == null || name.equals(exclude)) continue;
+            out.add(new int[] { id });
+        }
+        return out;
+    }
+
+    /** The packages on a display, in the order the framework lists them. */
+    public static java.util.List<String> packagesOn(int displayId, String exclude) {
+        java.util.LinkedHashSet<String> names = new java.util.LinkedHashSet<>();
+        for (Object task : rootTasks()) {
+            Integer display = number(task, "displayId");
+            if (display == null || display != displayId) continue;
+            String name = packageOf(task);
+            if (name != null && !name.equals(exclude)) names.add(name);
+        }
+        return new ArrayList<>(names);
+    }
+
     public static boolean resize(int taskId, int left, int top, int right, int bottom) {
         try {
             Object service = service();

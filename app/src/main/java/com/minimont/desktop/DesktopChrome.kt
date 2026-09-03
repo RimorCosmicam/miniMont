@@ -98,7 +98,12 @@ class DesktopChrome(
                         onBack = { controller.key(KEYCODE_BACK) },
                         // Home shows the desktop rather than leaving for the phone's launcher.
                         // Leaving would end the thing you are using.
-                        onHome = controller::showBackdrop
+                        onHome = controller::showBackdrop,
+                        desktops = state.desktops,
+                        desktop = state.desktop,
+                        onShowDesktop = controller::showDesktop,
+                        onAddDesktop = controller::addDesktop,
+                        onRemoveDesktop = controller::removeDesktop
                     )
                 }
             }
