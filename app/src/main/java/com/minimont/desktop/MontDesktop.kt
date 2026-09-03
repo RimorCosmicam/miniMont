@@ -85,7 +85,7 @@ private val DesktopStore.Thickness.gap: Int get() = padding
 
 /** What the chrome can have open above the dock. At most one, because two is a window manager. */
 private enum class Panel {
-    NONE, APPS, SETTINGS, ITEM, CALENDAR, NOTIFICATIONS, QUICK, WINDOWS,
+    NONE, APPS, SETTINGS, ITEM, CALENDAR, NOTIFICATIONS, QUICK, WINDOWS, WIDGETS,
     CLOCK_MENU, BATTERY_MENU, NOTIFICATION_MENU
 }
 
@@ -135,10 +135,7 @@ fun MontDesktop(
     val asked by DesktopRequests.asked.collectAsState()
     LaunchedEffect(asked) {
         when (asked) {
-            DesktopRequests.Panel.WIDGETS -> {
-                section = Section.DESKTOP
-                panel = Panel.SETTINGS
-            }
+            DesktopRequests.Panel.WIDGETS -> panel = Panel.WIDGETS
             DesktopRequests.Panel.WALLPAPER -> {
                 section = Section.WALLPAPER
                 panel = Panel.SETTINGS
@@ -251,6 +248,8 @@ fun MontDesktop(
                 onSettings = { panel = Panel.SETTINGS },
                 onClose = { panel = Panel.NONE }
             )
+
+            Panel.WIDGETS -> WidgetPicker { panel = Panel.NONE }
 
             Panel.WINDOWS -> WindowsCard(
                 apps = apps.filter { it.packageName in running },
@@ -599,11 +598,7 @@ private fun WallpaperSection(state: DesktopStore.State, onPickImage: () -> Unit)
  */
 @Composable
 private fun DesktopSection(state: DesktopStore.State) {
-    val context = LocalContext.current
     val scale = LocalMontScale.current
-    var adding by remember { mutableStateOf(false) }
-    val providers = remember(adding) { if (adding) Widgets.providers(context) else emptyList() }
-
     MontDetail(
         when (state.items.size) {
             0 -> "Nothing on the desktop."
@@ -613,46 +608,101 @@ private fun DesktopSection(state: DesktopStore.State) {
     )
     Spacer(Modifier.height(10.dp * scale))
 
-    if (!adding) {
-        MontRow(label = "Add a widget") { adding = true }
-        if (state.items.isNotEmpty()) {
-            MontRow(label = "Clear the desktop", active = false) {
-                state.items.forEach { DesktopStore.removeItem(it.id) }
-            }
-        }
-        Spacer(Modifier.height(8.dp * scale))
-        MontDetail("Applications are added from the app list, and dragged wherever you want them.")
-        return
-    }
-
-    MontLabel("WIDGETS", size = 11, alpha = MontWhite.DETAIL)
-    Spacer(Modifier.height(6.dp * scale))
-    if (providers.isEmpty()) MontDetail("Nothing installed offers one.")
-    providers.forEach { provider ->
-        MontRow(label = provider.label) {
-            // Bound here rather than when it is drawn: a widget that cannot be bound should fail
-            // in a list somebody is reading, not as an empty rectangle on the desktop later.
-            val host = android.appwidget.AppWidgetHost(context, Widgets.HOST_ID)
-            val id = Widgets.bind(context, host, provider.provider)
-            if (id != 0) {
-                DesktopStore.addItem(
-                    DesktopStore.Item(
-                        id = "w" + System.currentTimeMillis(),
-                        kind = DesktopStore.Kind.WIDGET,
-                        component = provider.provider.flattenToShortString(),
-                        x = 40,
-                        y = 40,
-                        width = provider.width,
-                        height = provider.height,
-                        widgetId = id
-                    )
-                )
-            }
-            adding = false
+    if (state.items.isNotEmpty()) {
+        MontRow(label = "Clear the desktop", active = false) {
+            state.items.forEach { DesktopStore.removeItem(it.id) }
         }
     }
     Spacer(Modifier.height(8.dp * scale))
-    MontRow(label = "Cancel", active = false) { adding = false }
+    MontDetail(
+        "Right click the desktop to add a widget or an application, and drag either one wherever " +
+            "you want it."
+    )
+}
+
+/**
+ * The widget picker: what each one looks like, not what it is called.
+ *
+ * A list of provider names is a list of words like "Clock 4x1" and "At a Glance", which tell you
+ * nothing about what you are about to put on your desktop. Providers draw a preview of themselves
+ * for exactly this, so the picker shows that and puts the name under it — and where a provider drew
+ * no preview, its icon, because a grid with one blank rectangle in it is still readable and a grid
+ * of blank rectangles is a list with worse spacing.
+ */
+@Composable
+private fun WidgetPicker(onClose: () -> Unit) {
+    val context = LocalContext.current
+    val scale = LocalMontScale.current
+    val providers = remember { Widgets.providers(context) }
+
+    DesktopCard(width = 560, maxHeight = 420) {
+        MontLabel("WIDGETS", size = 16, alpha = MontWhite.PRIMARY)
+        Spacer(Modifier.height(10.dp * scale))
+
+        if (providers.isEmpty()) MontDetail("Nothing installed offers one.")
+
+        providers.chunked(3).forEach { row ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp * scale)) {
+                row.forEach { provider ->
+                    Column(
+                        Modifier
+                            .weight(1f)
+                            .padding(horizontal = 4.dp * scale)
+                            .combinedClickable { add(context, provider); onClose() },
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(86.dp * scale)
+                                .background(Color.White.copy(alpha = MontWhite.TRACK)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            provider.preview?.let { preview ->
+                                Image(
+                                    preview,
+                                    contentDescription = provider.label,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    contentScale = ContentScale.Fit
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(4.dp * scale))
+                        MontLabel(provider.label, size = 11, alpha = MontWhite.PRIMARY)
+                        MontLabel(provider.app, size = 10, alpha = MontWhite.DETAIL)
+                    }
+                }
+                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+
+        Spacer(Modifier.height(10.dp * scale))
+        MontRow(label = "Close", active = false) { onClose() }
+    }
+}
+
+/**
+ * Bind a widget and put it on the desktop.
+ *
+ * Bound at the moment of choosing rather than when it is first drawn: one that cannot be bound
+ * should fail while somebody is looking at a picker, not as an empty rectangle discovered later.
+ */
+private fun add(context: android.content.Context, provider: AppWidgetProviderEntry) {
+    val host = android.appwidget.AppWidgetHost(context, Widgets.HOST_ID)
+    val id = Widgets.bind(context, host, provider.provider)
+    if (id == 0) return
+    DesktopStore.addItem(
+        DesktopStore.Item(
+            id = "w" + System.currentTimeMillis(),
+            kind = DesktopStore.Kind.WIDGET,
+            component = provider.provider.flattenToShortString(),
+            x = 40,
+            y = 40,
+            width = provider.width,
+            height = provider.height,
+            widgetId = id
+        )
+    )
 }
 
 /**
