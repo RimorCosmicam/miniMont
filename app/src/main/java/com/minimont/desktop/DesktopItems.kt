@@ -316,6 +316,10 @@ fun DesktopItems(
     }
 }
 
+/** Where a press inside an item is, on the desktop: its own corner plus the press, both in dp. */
+private fun DesktopStore.Item.at(press: Offset, density: androidx.compose.ui.unit.Density): Offset =
+    with(density) { Offset(x + press.x.toDp().value, y + press.y.toDp().value) }
+
 /**
  * What stands in for something while it is being moved.
  *
@@ -415,6 +419,7 @@ private fun Shortcut(
     onHold: (Offset) -> Unit
 ) {
     val context = LocalContext.current
+    val density = LocalDensity.current
     val app = remember(item.component) {
         AppCatalog.byPackage(context, item.component.substringBefore('/'))
     }
@@ -426,7 +431,11 @@ private fun Shortcut(
         // growing to hold it.
         Modifier
             .width(Grid.WIDE.dp)
-            .secondary { at -> onHold(Offset(item.x + at.x, item.y + at.y)) }
+            // The press arrives in pixels and the item's position is in dp. Added together
+            // without converting, the menu landed near the cursor and never on it — off by exactly
+            // the display's density, which at 1.5 is close enough to look like a rounding error
+            // and far enough to be wrong.
+            .secondary { at -> onHold(item.at(at, density)) }
             .combinedClickable(
                 onClick = onOpen,
                 onLongClick = { onHold(Offset(item.x.toFloat(), item.y.toFloat())) }
@@ -461,6 +470,7 @@ private fun Widget(
     onHold: (Offset) -> Unit
 ) {
     val context = LocalContext.current
+    val density = LocalDensity.current
 
     // The item's own size, read every time, not remembered.
     //
@@ -476,7 +486,7 @@ private fun Widget(
             .size(width.dp, height.dp)
             // Right click and hold reach the widget's own menu. A plain tap is left to the widget,
             // which usually has something of its own to do with it.
-            .secondary { at -> onHold(Offset(item.x + at.x, item.y + at.y)) }
+            .secondary { at -> onHold(item.at(at, density)) }
             .combinedClickable(
                 onClick = {},
                 onLongClick = { onHold(Offset(item.x.toFloat(), item.y.toFloat())) }
