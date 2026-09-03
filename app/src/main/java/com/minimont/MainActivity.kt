@@ -116,6 +116,28 @@ class MainActivity : ComponentActivity() {
         val paired by controller.pairing.collectAsState()
         var welcomed by remember { mutableStateOf(welcomeSeen) }
 
+        // Accessibility is not only switched on in Settings — it is switched *off* by Android,
+        // without asking, every time this app is force-stopped, which is every time it is
+        // installed. Watching the setting means the screen tells the truth while somebody is
+        // looking at it, rather than only after a restart that would strip the grant again.
+        DisposableEffect(Unit) {
+            val observer = object : android.database.ContentObserver(
+                android.os.Handler(android.os.Looper.getMainLooper())
+            ) {
+                override fun onChange(selfChange: Boolean) {
+                    accessibility = MontAccessibilityService.granted(this@MainActivity)
+                }
+            }
+            contentResolver.registerContentObserver(
+                android.provider.Settings.Secure.getUriFor(
+                    android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+                ),
+                false,
+                observer
+            )
+            onDispose { contentResolver.unregisterContentObserver(observer) }
+        }
+
         // Both of these are switched on in Settings, which means the user is always in another app
         // when they change. A value sampled once at composition is a value that never changes.
         val owner = LocalLifecycleOwner.current
