@@ -10,11 +10,6 @@ import androidx.activity.compose.setContent
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -206,10 +201,6 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun DesktopCard(controller: DesktopController) {
         val state by controller.state.collectAsState()
-        val transition = rememberInfiniteTransition(label = "desktop")
-        val travel by transition.animateFloat(
-            0f, 1f, infiniteRepeatable(tween(5200, easing = LinearEasing)), label = "stripes"
-        )
         val accent = when (state.stage) {
             DesktopStage.RUNNING -> MontAccent.Live
             DesktopStage.FAILED -> MontAccent.Danger
@@ -218,7 +209,7 @@ class MainActivity : ComponentActivity() {
 
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             DiagonalStripes(
-                travel = travel,
+                travel = 0f,
                 first = accent,
                 second = Color.Black,
                 modifier = Modifier.fillMaxSize()

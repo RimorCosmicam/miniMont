@@ -21,6 +21,11 @@ import androidx.compose.ui.unit.dp
  *
  * The same geometry the AirMate client and MiniMate use — 34dp apart at 26.565 degrees — so the
  * three of them cannot drift into being three different patterns.
+ *
+ * [travel] is left at zero everywhere in miniMont. Mont has them scrolling slowly, and on a cover
+ * display three inches across that is several hundred rectangles redrawn every frame behind a
+ * wordmark — which stuttered, and a stuttering ornament is worse than a still one. They still carry
+ * their state in colour, which is the part that was ever doing any work.
  */
 @Composable
 fun DiagonalStripes(

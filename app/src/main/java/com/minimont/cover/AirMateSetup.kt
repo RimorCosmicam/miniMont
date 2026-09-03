@@ -1,10 +1,5 @@
 package com.minimont.cover
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,10 +39,6 @@ import com.minimont.ui.mont.MontRow
 @Composable
 fun AirMateSetup(controller: DesktopController) {
     val state by controller.state.collectAsState()
-    val transition = rememberInfiniteTransition(label = "airmate")
-    val travel by transition.animateFloat(
-        0f, 1f, infiniteRepeatable(tween(5200, easing = LinearEasing)), label = "stripes"
-    )
     val accent = when {
         state.stage == DesktopStage.FAILED -> MontAccent.Danger
         state.running -> MontAccent.Live
@@ -55,7 +46,7 @@ fun AirMateSetup(controller: DesktopController) {
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        DiagonalStripes(travel, accent, Color.Black, modifier = Modifier.fillMaxSize())
+        DiagonalStripes(0f, accent, Color.Black, modifier = Modifier.fillMaxSize())
         Column(
             Modifier
                 .fillMaxWidth()

@@ -5,7 +5,6 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -63,10 +62,6 @@ fun Welcome(
     onFinished: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val transition = rememberInfiniteTransition(label = "welcome")
-    val travel by transition.animateFloat(
-        0f, 1f, infiniteRepeatable(tween(5200, easing = LinearEasing)), label = "stripes"
-    )
     var leaving by remember { mutableStateOf(false) }
     val journey by animateFloatAsState(
         targetValue = if (leaving) 1f else 0f,
@@ -78,7 +73,7 @@ fun Welcome(
 
     Box(modifier.fillMaxSize().background(Color.Black)) {
         DiagonalStripes(
-            travel = travel,
+            travel = 0f,
             first = MontAccent.Mustard,
             second = Color.Black,
             split = journey,
