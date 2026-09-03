@@ -93,6 +93,7 @@ class DesktopChrome(
                         onFit = controller::fit,
                         onArea = controller::setArea,
                         onOpenPhone = controller::open,
+                        onArrangeWindow = controller::arrange,
                         // Back goes back in whatever has focus on this display.
                         onBack = { controller.key(KEYCODE_BACK) },
                         // Home shows the desktop rather than leaving for the phone's launcher.

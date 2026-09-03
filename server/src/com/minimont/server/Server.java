@@ -269,6 +269,12 @@ public final class Server {
                 announce(true);
                 break;
             }
+            case "arrange": {
+                int gap = argument.indexOf(' ');
+                if (gap < 0) return;
+                Desktop.arrange(argument.substring(0, gap), argument.substring(gap + 1).trim());
+                break;
+            }
             case "open": {
                 if (display == null || argument.isEmpty()) return;
                 int gap = argument.indexOf(' ');

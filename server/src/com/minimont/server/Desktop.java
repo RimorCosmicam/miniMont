@@ -195,15 +195,29 @@ public final class Desktop {
      * The regions are the apps area, halved — so a filled window leaves the same gap above the
      * taskbar that the taskbar leaves below itself, and a half fills exactly half of what is left.
      */
+    /** The same, found by package, which is what a taskbar knows about an application. */
+    public static boolean arrange(String packageName, String where) {
+        int[] found = Tasks.find(packageName);
+        if (found == null) return false;
+        return arrange(found[0], where);
+    }
+
     public static boolean arrange(int taskId, String where) {
         int[] safe = area;
         if (safe[2] <= safe[0] || safe[3] <= safe[1]) return false;
         int left = safe[0], top = safe[1], right = safe[2], bottom = safe[3];
         int middle = (left + right) / 2;
+        int centre = (top + bottom) / 2;
         switch (where) {
             case "fill": break;
             case "left": right = middle; break;
             case "right": left = middle; break;
+            case "top": bottom = centre; break;
+            case "bottom": top = centre; break;
+            case "tl": right = middle; bottom = centre; break;
+            case "tr": left = middle; bottom = centre; break;
+            case "bl": right = middle; top = centre; break;
+            case "br": left = middle; top = centre; break;
             default: return false;
         }
         Ln.i("DESKTOP", "snapping task " + taskId + " " + where);

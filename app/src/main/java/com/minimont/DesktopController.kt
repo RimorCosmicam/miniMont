@@ -427,6 +427,9 @@ class DesktopController private constructor(private val context: Context) {
     fun setArea(left: Int, top: Int, right: Int, bottom: Int) =
         send("area $left $top $right $bottom")
 
+    /** Put an application's window in one of the regions: filled, a half, or a quarter. */
+    fun arrange(packageName: String, where: String) = send("arrange $packageName $where")
+
     /** Bring a window back inside that area, for the one that is already off the screen. */
     fun fit(packageName: String) = send("fit $packageName")
 

@@ -121,6 +121,7 @@ fun MontDesktop(
     onFit: (String) -> Unit,
     onArea: (Int, Int, Int, Int) -> Unit,
     onOpenPhone: (String) -> Unit,
+    onArrangeWindow: (String, String) -> Unit,
     onBack: () -> Unit,
     onHome: () -> Unit
 ) {
@@ -227,6 +228,10 @@ fun MontDesktop(
                     },
                     onFit = {
                         onFit(app.packageName)
+                        panel = Panel.NONE
+                    },
+                    onArrange = { where ->
+                        onArrangeWindow(app.packageName, where)
                         panel = Panel.NONE
                     },
                     onInfo = {
@@ -821,9 +826,11 @@ private fun ItemCard(
     onClose: () -> Unit,
     onFit: () -> Unit,
     onInfo: () -> Unit,
+    onArrange: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    DesktopCard(width = 300, maxHeight = 220) {
+    val scale = LocalMontScale.current
+    DesktopCard(width = 300, maxHeight = 340) {
         MontLabel(app.label.uppercase(), size = 16, alpha = MontWhite.PRIMARY)
         Spacer(Modifier.height(10.dp * LocalMontScale.current))
         MontRow(label = if (pinned) "Unpin from the taskbar" else "Pin to the taskbar") {
@@ -831,6 +838,24 @@ private fun ItemCard(
             onDismiss()
         }
         MontRow(label = "App info") { onInfo() }
+
+        if (open) {
+            Spacer(Modifier.height(10.dp * scale))
+            MontLabel("ARRANGE", size = 11, alpha = MontWhite.DETAIL)
+            Spacer(Modifier.height(4.dp * scale))
+            listOf(
+                "Fill the screen" to "fill",
+                "Left half" to "left",
+                "Right half" to "right",
+                "Top left" to "tl",
+                "Top right" to "tr",
+                "Bottom left" to "bl",
+                "Bottom right" to "br"
+            ).forEach { (label, where) ->
+                MontRow(label = label) { onArrange(where) }
+            }
+            Spacer(Modifier.height(10.dp * scale))
+        }
         MontRow(label = "Add to the desktop") {
             val where = DesktopStore.nextCell()
             DesktopStore.addItem(
