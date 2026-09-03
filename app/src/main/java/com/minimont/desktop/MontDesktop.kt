@@ -899,6 +899,46 @@ private fun SettingToggle(label: String, checked: Boolean, onChange: (Boolean) -
     }
 }
 
+/**
+ * Where a window can go, drawn rather than listed.
+ *
+ * Seven lines of words for seven rectangles is reading a description of a shape instead of looking
+ * at one. Each is the screen: mustard is what the window would take, white at nine percent is what
+ * would be left. You pick the picture that matches what you want, which is faster than parsing
+ * "bottom right" and never ambiguous about which corner anybody means.
+ */
+@Composable
+private fun Arrangements(onArrange: (String) -> Unit) {
+    val scale = LocalMontScale.current
+    // Each is the fraction of the screen the window would take: left, top, width, height.
+    val options = listOf(
+        "fill" to listOf(0f, 0f, 1f, 1f),
+        "left" to listOf(0f, 0f, .5f, 1f),
+        "right" to listOf(.5f, 0f, .5f, 1f),
+        "tl" to listOf(0f, 0f, .5f, .5f),
+        "tr" to listOf(.5f, 0f, .5f, .5f),
+        "bl" to listOf(0f, .5f, .5f, .5f),
+        "br" to listOf(.5f, .5f, .5f, .5f)
+    )
+
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp * scale)) {
+        options.forEach { (where, region) ->
+            Canvas(
+                Modifier
+                    .size(width = 30.dp * scale, height = 20.dp * scale)
+                    .combinedClickable { onArrange(where) }
+            ) {
+                drawRect(Color.White.copy(alpha = MontWhite.TRACK), size = size)
+                drawRect(
+                    MontAccent.Mustard,
+                    topLeft = Offset(size.width * region[0], size.height * region[1]),
+                    size = Size(size.width * region[2], size.height * region[3])
+                )
+            }
+        }
+    }
+}
+
 /** What can be done to one dock item. Held rather than tapped, so a tap stays a launch. */
 @Composable
 private fun ItemCard(
@@ -927,18 +967,8 @@ private fun ItemCard(
         if (open) {
             Spacer(Modifier.height(10.dp * scale))
             MontLabel("ARRANGE", size = 11, alpha = MontWhite.DETAIL)
-            Spacer(Modifier.height(4.dp * scale))
-            listOf(
-                "Fill the screen" to "fill",
-                "Left half" to "left",
-                "Right half" to "right",
-                "Top left" to "tl",
-                "Top right" to "tr",
-                "Bottom left" to "bl",
-                "Bottom right" to "br"
-            ).forEach { (label, where) ->
-                MontRow(label = label) { onArrange(where) }
-            }
+            Spacer(Modifier.height(6.dp * scale))
+            Arrangements(onArrange)
             Spacer(Modifier.height(10.dp * scale))
         }
         MontRow(label = "Add to the desktop") {

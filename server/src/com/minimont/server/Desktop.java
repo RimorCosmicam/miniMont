@@ -28,6 +28,7 @@ public final class Desktop {
     /** Intent flags, for the launch that has to make its own task rather than reuse one. */
     private static final int NEW_TASK = 0x10000000;
     private static final int MULTIPLE_TASK = 0x08000000;
+    private static final int REORDER_TO_FRONT = 0x00020000;
 
     /**
      * Where windows are allowed to open: the screen, less the taskbar and its own padding.
@@ -53,6 +54,17 @@ public final class Desktop {
      * and so the display always has something on it — an empty trusted display is a black
      * rectangle that gives no sign of whether anything worked.
      */
+    /**
+     * Bring the backdrop out from under everything.
+     *
+     * Starting it again is not enough: it is already running, so `am start` hands the intent to the
+     * instance that exists and leaves it exactly where it was — underneath every window, which is
+     * where a backdrop lives. Reordering its task to the front is what actually shows the desktop.
+     */
+    public static boolean showDesktop(int displayId, String component) {
+        return start(displayId, component, FULLSCREEN, false, NEW_TASK | REORDER_TO_FRONT);
+    }
+
     public static boolean backdrop(int displayId, String component) {
         return start(displayId, component, FULLSCREEN, true);
     }

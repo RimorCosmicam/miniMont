@@ -71,6 +71,9 @@ public final class Server {
      * here rather than in the app because a tap on the tablet never passes through the app.
      */
     private volatile boolean armRight;
+
+    /** Which button the current press turned into, so its release can match it. */
+    private int heldButton;
     private Desktops desks;
 
     private int width;
@@ -349,7 +352,7 @@ public final class Server {
                 break;
             }
             case "backdrop": {
-                if (display != null && !backdrop.isEmpty()) Desktop.backdrop(display.id(), backdrop);
+                if (display != null && !backdrop.isEmpty()) Desktop.showDesktop(display.id(), backdrop);
                 break;
             }
             case "running": {
@@ -371,9 +374,20 @@ public final class Server {
                 String[] parts = argument.split(" ");
                 int button = Integer.parseInt(parts[0]);
                 boolean down = "1".equals(parts[1]);
-                if (armRight && button == 1) {
-                    button = 2;
-                    if (!down) disarm();
+                // A release is whatever its own press turned out to be.
+                //
+                // Press and release were converted independently, so anything that disarmed
+                // between them — a tap arriving from the tablet, say — pressed button two and
+                // released button one. Button two then stayed down for ever: menus opened and
+                // would not close, and nothing else worked either, because something was always
+                // being held.
+                if (down) {
+                    if (armRight && button == 1) button = 2;
+                    heldButton = button;
+                } else {
+                    if (heldButton != 0) button = heldButton;
+                    heldButton = 0;
+                    if (armRight && button == 2) disarm();
                 }
                 float x = pointer.x();
                 float y = pointer.y();
