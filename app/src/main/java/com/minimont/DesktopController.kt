@@ -1,6 +1,7 @@
 package com.minimont
 
 import android.content.Context
+import android.media.MediaScannerConnection
 import android.util.Log
 import com.minimont.adb.AdbClient
 import com.minimont.adb.AdbMdns
@@ -8,6 +9,7 @@ import io.github.muntashirakon.adb.AdbStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -78,7 +80,11 @@ data class DesktopState(
     val desktops: List<List<String>> = listOf(emptyList()),
     val desktop: Int = 0,
     /** Whether the next click has been asked to be a right click. */
-    val armed: Boolean = false
+    val armed: Boolean = false,
+    /** Where the last screenshot was saved, or null if the last one did not save. */
+    val shot: String? = null,
+    /** When the last screenshot came back, so the button can say so without saying anything. */
+    val shotAt: Long = 0L
 ) {
     /** The sizes worth offering: the ordinary ones, minus anything past the client's decoder. */
     val choices: List<Pair<Int, Int>>
@@ -308,6 +314,25 @@ class DesktopController private constructor(private val context: Context) {
                                     "Try it with One UI's own decorations switched on."
                             )
                         }
+                        line.startsWith("[EVENT] shot") -> {
+                            val path = line.substringAfter("shot").trim()
+                            _cursorHidden.value = false
+                            val saved = path.isNotEmpty() && path != "-"
+                            if (saved) {
+                                // The host has no Context to tell the scanner with, so the file
+                                // would sit there unseen by the gallery until something else looked.
+                                MediaScannerConnection.scanFile(
+                                    context, arrayOf(path), arrayOf("image/png"), null
+                                )
+                            }
+                            _state.update {
+                                it.copy(
+                                    shot = if (saved) path else null,
+                                    shotAt = System.currentTimeMillis()
+                                )
+                            }
+                        }
+
                         line.startsWith("[EVENT] armed") -> {
                             val on = line.trim().endsWith("1")
                             _state.update { it.copy(armed = on) }
@@ -399,6 +424,28 @@ class DesktopController private constructor(private val context: Context) {
      */
     private val _cursor = MutableStateFlow(0f to 0f)
     val cursor = _cursor.asStateFlow()
+
+    /** Whether the drawn cursor should stand out of the way — true only while a shot is taken. */
+    private val _cursorHidden = MutableStateFlow(false)
+    val cursorHidden = _cursorHidden.asStateFlow()
+
+    /**
+     * The desktop, saved as a picture.
+     *
+     * The pointer goes first. It is a window on this display like everything else, so it would
+     * otherwise be in the file, and a screenshot with the mouse in it is a screenshot of the mouse.
+     * It comes back when the host says the file is written, or shortly after regardless: an
+     * invisible cursor is a worse failure than a cursor in a picture.
+     */
+    fun screenshot() {
+        scope.launch {
+            _cursorHidden.value = true
+            delay(160)
+            send("shot")
+            delay(1500)
+            _cursorHidden.value = false
+        }
+    }
 
     /**
      * Relative movement in, absolute position out.

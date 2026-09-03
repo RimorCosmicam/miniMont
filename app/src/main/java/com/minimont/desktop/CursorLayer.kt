@@ -6,6 +6,7 @@ import android.graphics.Color as AndroidColor
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.view.Display
+import android.view.View
 import android.view.Gravity
 import android.view.WindowManager
 import androidx.compose.foundation.Canvas
@@ -113,6 +114,7 @@ class CursorLayer(
                 }
             }
         }
+        arrow = view
         setContentView(view)
         registry.currentState = Lifecycle.State.CREATED
     }
@@ -134,11 +136,19 @@ class CursorLayer(
                 window?.attributes = current
             }
         }
+        // Out of the way while a screenshot is taken, and only for that.
+        duck = scope.launch {
+            controller.cursorHidden.collect { hidden ->
+                arrow?.visibility = if (hidden) View.INVISIBLE else View.VISIBLE
+            }
+        }
     }
 
     override fun onStop() {
         follow?.cancel()
         follow = null
+        duck?.cancel()
+        duck = null
         registry.currentState = Lifecycle.State.DESTROYED
         store.clear()
         super.onStop()
@@ -146,6 +156,8 @@ class CursorLayer(
 
     private val scope = CoroutineScope(Dispatchers.Main.immediate)
     private var follow: Job? = null
+    private var duck: Job? = null
+    private var arrow: View? = null
 
     private companion object {
         /** Big enough for the arrow and nothing else. */

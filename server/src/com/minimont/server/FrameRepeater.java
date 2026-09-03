@@ -1,5 +1,7 @@
 package com.minimont.server;
 
+import android.graphics.Bitmap;
+import android.graphics.Matrix;
 import android.graphics.SurfaceTexture;
 import android.opengl.EGL14;
 import android.opengl.EGLConfig;
@@ -11,6 +13,8 @@ import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
 import android.view.Surface;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
@@ -71,6 +75,9 @@ public final class FrameRepeater {
     private final Surface encoderSurface;
     private final Thread thread;
 
+    private volatile String pendingShot;
+    private volatile Shot shotListener;
+
     private final Object frameLock = new Object();
     private boolean frameAvailable;
     private volatile boolean running = true;
@@ -125,6 +132,24 @@ public final class FrameRepeater {
     /** The surface the virtual display should draw into. */
     public Surface displaySurface() {
         return displaySurface;
+    }
+
+    /** Told where a screenshot ended up, once it is actually on disk. */
+    public interface Shot {
+        void taken(String path, boolean saved);
+    }
+
+    /**
+     * Keep the next frame drawn.
+     *
+     * screencap cannot see this display — it only knows physical ones — but this pass draws every
+     * frame the encoder sends, so the pixels are already here for the reading.
+     */
+    public void capture(String path, Shot listener) {
+        shotListener = listener;
+        pendingShot = path;
+        // A still desktop still ticks, but not for up to an idle interval; ask for a frame now.
+        synchronized (frameLock) { frameLock.notifyAll(); }
     }
 
     private void loop() {
@@ -258,9 +283,54 @@ public final class FrameRepeater {
         GLES20.glUniform1i(GLES20.glGetUniformLocation(program, "texture"), 0);
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
 
+        String wanted = pendingShot;
+        if (wanted != null) {
+            pendingShot = null;
+            save(wanted);
+        }
+
         // The encoder stamps its output with this, and the client measures latency from it.
         EGLExt.eglPresentationTimeANDROID(eglDisplay, eglSurface, System.nanoTime());
         EGL14.eglSwapBuffers(eglDisplay, eglSurface);
+    }
+
+    /**
+     * The frame just drawn, as a PNG.
+     *
+     * The read happens here because the back buffer is only ours until it is swapped. Everything
+     * after it — the flip, the compress, the write — is handed to another thread, so a screenshot
+     * costs the stream one read rather than a quarter second of PNG.
+     */
+    private void save(String path) {
+        Shot listener = shotListener;
+        shotListener = null;
+        ByteBuffer pixels = ByteBuffer.allocateDirect(width * height * 4).order(ByteOrder.nativeOrder());
+        GLES20.glReadPixels(0, 0, width, height, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, pixels);
+        pixels.position(0);
+        Thread writer = new Thread(() -> {
+            boolean saved = false;
+            try {
+                Bitmap upsideDown = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+                upsideDown.copyPixelsFromBuffer(pixels);
+                // GL counts rows from the bottom of the screen and everything else counts from the top.
+                Matrix flip = new Matrix();
+                flip.setScale(1f, -1f);
+                Bitmap shot = Bitmap.createBitmap(upsideDown, 0, 0, width, height, flip, false);
+                upsideDown.recycle();
+                File file = new File(path);
+                File folder = file.getParentFile();
+                if (folder != null) folder.mkdirs();
+                try (FileOutputStream out = new FileOutputStream(file)) {
+                    saved = shot.compress(Bitmap.CompressFormat.PNG, 100, out);
+                }
+                shot.recycle();
+            } catch (Throwable failure) {
+                Ln.e("VIDEO", "screenshot failed", failure);
+            }
+            if (listener != null) listener.taken(path, saved);
+        }, "miniMont-Shot");
+        writer.setDaemon(true);
+        writer.start();
     }
 
     private static int link() {

@@ -319,6 +319,10 @@ public final class Server {
                 Desktop.arrange(argument.substring(0, gap), argument.substring(gap + 1).trim());
                 break;
             }
+            case "shot": {
+                takeShot();
+                break;
+            }
             case "open": {
                 if (display == null || argument.isEmpty()) return;
                 int gap = argument.indexOf(' ');
@@ -439,6 +443,25 @@ public final class Server {
      * dock that flickers for reasons nobody can see. @param force sends it regardless, for the
      * moment immediately after a launch or a close when the answer is the whole point.
      */
+    /**
+     * The desktop, as a file.
+     *
+     * Where the phone keeps its own screenshots, so the gallery has somewhere to find it. The
+     * client is told the path so it can ask the media scanner to index it — this process has no
+     * Context to ask with.
+     */
+    private void takeShot() {
+        FrameRepeater pass = repeater;
+        if (pass == null) {
+            Ln.i("EVENT", "shot -");
+            return;
+        }
+        String stamp = new java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US)
+                .format(new java.util.Date());
+        String path = "/sdcard/Pictures/Screenshots/miniMont-" + stamp + ".png";
+        pass.capture(path, (where, saved) -> Ln.i("EVENT", "shot " + (saved ? where : "-")));
+    }
+
     private void announce(boolean force) {
         if (display == null) return;
         // What has a window here, which is what the taskbar is a list of. Asking the process list

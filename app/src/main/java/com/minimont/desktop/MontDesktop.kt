@@ -132,6 +132,10 @@ fun MontDesktop(
     desktop: Int,
     armed: Boolean,
     onArm: () -> Unit,
+    onScreenshot: () -> Unit,
+    /** When the last screenshot came back, and whether it saved — the button's only feedback. */
+    shotAt: Long,
+    shotSaved: Boolean,
     onShowDesktop: (Int) -> Unit,
     onAddDesktop: () -> Unit,
     onRemoveDesktop: (Int) -> Unit
@@ -225,6 +229,9 @@ fun MontDesktop(
                     panel = if (panel == Panel.NOTIFICATIONS) Panel.NONE else Panel.NOTIFICATIONS
                 },
                 onNotificationMenu = { panel = Panel.NOTIFICATION_MENU },
+                onScreenshot = onScreenshot,
+                shotAt = shotAt,
+                shotSaved = shotSaved,
                 onArm = onArm
             )
     }
@@ -1012,6 +1019,9 @@ private fun Taskbar(
     onBatteryMenu: () -> Unit,
     onNotifications: () -> Unit,
     onNotificationMenu: () -> Unit,
+    onScreenshot: () -> Unit,
+    shotAt: Long,
+    shotSaved: Boolean,
     onArm: () -> Unit
 ) {
     val scale = LocalMontScale.current
@@ -1064,7 +1074,10 @@ private fun Taskbar(
             onBattery = onBattery,
             onBatteryMenu = onBatteryMenu,
             onNotifications = onNotifications,
-            onNotificationMenu = onNotificationMenu
+            onNotificationMenu = onNotificationMenu,
+            onScreenshot = onScreenshot,
+            shotAt = shotAt,
+            shotSaved = shotSaved
         )
     }
 }
@@ -1310,7 +1323,10 @@ private fun StatusBlock(
     onBattery: () -> Unit,
     onBatteryMenu: () -> Unit,
     onNotifications: () -> Unit,
-    onNotificationMenu: () -> Unit
+    onNotificationMenu: () -> Unit,
+    onScreenshot: () -> Unit,
+    shotAt: Long,
+    shotSaved: Boolean
 ) {
     val context = LocalContext.current
     val scale = LocalMontScale.current
@@ -1330,7 +1346,19 @@ private fun StatusBlock(
     val date = remember(now) { SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(now) }
     val level = if (battery in 1..19) MontAccent.LowBattery else MontAccent.Live
 
+    // The only reply a screenshot gets. A card saying "saved" would be a card in every screenshot
+    // taken after it, and the mark going mustard says the same thing without joining the picture.
+    var flash by remember { mutableStateOf<Color?>(null) }
+    LaunchedEffect(shotAt) {
+        if (shotAt == 0L) return@LaunchedEffect
+        flash = if (shotSaved) MontAccent.Mustard else MontAccent.LowBattery
+        kotlinx.coroutines.delay(900)
+        flash = null
+    }
+
     TaskbarRun(modifier, vertical = vertical, spacing = 14.dp * scale) {
+        ShotMark(thickness = thickness, flash = flash, onClick = onScreenshot)
+
         // Nothing announces itself: with nothing waiting there is no bubble, not an empty one.
         if (notes.isNotEmpty()) {
             Bubble(
@@ -1402,6 +1430,58 @@ private fun Bubble(count: Int, modifier: Modifier = Modifier) {
                 close()
             }
             drawPath(tail, Color.White)
+        }
+    }
+}
+
+/**
+ * Take a picture of the desktop.
+ *
+ * Crop corners rather than a camera: the thing being asked for is a rectangle of this screen, and
+ * four brackets say that at eleven pixels where a lens and a shutter button would be a smudge.
+ */
+@Composable
+private fun ShotMark(
+    thickness: DesktopStore.Thickness,
+    flash: Color?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val scale = LocalMontScale.current
+    var held by remember { mutableStateOf(false) }
+
+    Box(
+        modifier
+            .size(thickness.icon.dp * scale)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        held = true
+                        onClick()
+                        tryAwaitRelease()
+                        held = false
+                    }
+                )
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(Modifier.size((thickness.icon / 2 + 1).dp * scale)) {
+            val colour = flash
+                ?: Color.White.copy(alpha = if (held) MontWhite.ACTIVE else MontWhite.DIM)
+            val line = 1.6f * scale
+            val arm = size.minDimension * .36f
+            val edge = line / 2f
+            val far = size.width - edge
+            val low = size.height - edge
+            // Four corners, each two strokes: across, then down.
+            drawLine(colour, Offset(edge, edge), Offset(edge + arm, edge), line)
+            drawLine(colour, Offset(edge, edge), Offset(edge, edge + arm), line)
+            drawLine(colour, Offset(far - arm, edge), Offset(far, edge), line)
+            drawLine(colour, Offset(far, edge), Offset(far, edge + arm), line)
+            drawLine(colour, Offset(edge, low - arm), Offset(edge, low), line)
+            drawLine(colour, Offset(edge, low), Offset(edge + arm, low), line)
+            drawLine(colour, Offset(far, low - arm), Offset(far, low), line)
+            drawLine(colour, Offset(far - arm, low), Offset(far, low), line)
         }
     }
 }
