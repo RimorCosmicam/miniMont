@@ -46,9 +46,8 @@ import com.minimont.ui.mont.MontRow
 import com.minimont.ui.mont.MontSurface
 import com.minimont.ui.mont.MontWhite
 
-/** How big a desktop icon is, and how much room its name gets under it. */
+/** How big a desktop icon is. What holds it is the cell, and the cell is the grid's business. */
 private const val ICON = 48
-private const val LABEL = 92
 
 /**
  * The desktop's grid, the way a launcher has one.
@@ -235,8 +234,12 @@ private fun Shortcut(item: DesktopStore.Item, onOpen: () -> Unit, onHold: () -> 
     }
 
     Column(
+        // Exactly one cell wide. It was 92 against a cell of 72, so every icon overlapped the one
+        // in the next column and a tidy grid came out looking like nothing had snapped at all.
+        // A launcher's cell is the icon *and* its name; the name ellipsises rather than the cell
+        // growing to hold it.
         Modifier
-            .width(LABEL.dp)
+            .width(Grid.CELL.dp)
             .combinedClickable(onClick = onOpen, onLongClick = onHold),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
