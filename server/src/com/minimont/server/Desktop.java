@@ -190,6 +190,27 @@ public final class Desktop {
     }
 
     /**
+     * Put a window in one of the edges' regions.
+     *
+     * The regions are the apps area, halved — so a filled window leaves the same gap above the
+     * taskbar that the taskbar leaves below itself, and a half fills exactly half of what is left.
+     */
+    public static boolean arrange(int taskId, String where) {
+        int[] safe = area;
+        if (safe[2] <= safe[0] || safe[3] <= safe[1]) return false;
+        int left = safe[0], top = safe[1], right = safe[2], bottom = safe[3];
+        int middle = (left + right) / 2;
+        switch (where) {
+            case "fill": break;
+            case "left": right = middle; break;
+            case "right": left = middle; break;
+            default: return false;
+        }
+        Ln.i("DESKTOP", "snapping task " + taskId + " " + where);
+        return Tasks.resize(taskId, left, top, right, bottom);
+    }
+
+    /**
      * Put back anything Android has just filled the screen with.
      *
      * Its own caption offers a maximise, and that maximise is the *display* — it fills every pixel,

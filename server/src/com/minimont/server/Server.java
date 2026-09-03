@@ -316,7 +316,13 @@ public final class Server {
             case "b": {
                 if (pointer == null) return;
                 String[] parts = argument.split(" ");
-                pointer.button(Integer.parseInt(parts[0]), "1".equals(parts[1]));
+                int button = Integer.parseInt(parts[0]);
+                boolean down = "1".equals(parts[1]);
+                if (button == 1) {
+                    if (down) rememberDrag();
+                    else snapIfDragged();
+                }
+                pointer.button(button, down);
                 break;
             }
             case "w": {
@@ -359,6 +365,64 @@ public final class Server {
         reported = shown;
         Ln.i("EVENT", "running " + String.join(",", shown));
     }
+
+    /**
+     * What the pointer was on when the button went down, and where that window was.
+     *
+     * Android owns the window drag — its own caption is what you grab — so miniMont cannot watch
+     * one happen. It can watch what it already knows: which window the press landed in, where that
+     * window was at the time, and where the pointer ended up.
+     */
+    private int dragTask = -1;
+    private int[] dragBounds;
+
+    private void rememberDrag() {
+        dragTask = -1;
+        dragBounds = null;
+        if (display == null || pointer == null) return;
+        int x = (int) pointer.x();
+        int y = (int) pointer.y();
+        for (int[] window : Tasks.windows(display.id(), OURS)) {
+            if (x >= window[1] && x <= window[3] && y >= window[2] && y <= window[4]) {
+                dragTask = window[0];
+                dragBounds = new int[] { window[1], window[2], window[3], window[4] };
+                return;
+            }
+        }
+    }
+
+    /**
+     * Snap, if a window was actually dragged and the pointer finished at an edge.
+     *
+     * Both halves of that matter. Requiring the window to have *moved* is what stops a selection
+     * dragged to the side of a document from throwing the document across the screen; requiring the
+     * pointer to finish at an edge is what makes it a deliberate gesture rather than an accident of
+     * where somebody let go.
+     */
+    private void snapIfDragged() {
+        if (display == null || pointer == null || dragTask < 0 || dragBounds == null) return;
+        int task = dragTask;
+        int[] before = dragBounds;
+        dragTask = -1;
+        dragBounds = null;
+
+        boolean moved = false;
+        for (int[] window : Tasks.windows(display.id(), OURS)) {
+            if (window[0] != task) continue;
+            moved = window[1] != before[0] || window[2] != before[1];
+            break;
+        }
+        if (!moved) return;
+
+        int x = (int) pointer.x();
+        int y = (int) pointer.y();
+        if (y <= EDGE) Desktop.arrange(task, "fill");
+        else if (x <= EDGE) Desktop.arrange(task, "left");
+        else if (x >= width - EDGE) Desktop.arrange(task, "right");
+    }
+
+    /** How close to an edge counts as being at it. */
+    private static final int EDGE = 12;
 
     private static String packageOf(String component) {
         int slash = component.indexOf('/');
