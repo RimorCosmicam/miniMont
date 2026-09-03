@@ -34,12 +34,8 @@ object DesktopStore {
     /**
      * How thick the taskbar is.
      *
-     * Three steps, and every one of them bigger than it used to be. These are targets before they
-     * are decoration: the display is a thousand dp across, the pointer arrives over a network from
-     * a thumb on a three-inch pad, and twenty-six dp of icon was something you aimed at twice.
-     *
-     * The bar's height is set by the tallest thing in it, which is the clock stack and not the
-     * icons — so a thickness that only changed the icons would change
+     * Three steps, and small ones. The bar's height is set by the tallest thing in it, which is the
+     * clock stack and not the icons — so a thickness that only changed the icons would change
      * nothing at all. Each step moves the icons, the padding and the type together, and the type
      * never goes below the sizes Mont already uses for a clock and an explanatory line, because a
      * thinner bar you cannot read the date on is not a thinner bar, it is a broken one.
@@ -51,9 +47,9 @@ object DesktopStore {
         val time: Int,
         val date: Int
     ) {
-        THIN("Thin", 26, 6, 15, 10),
-        REGULAR("Regular", 32, 8, 16, 11),
-        LARGE("Large", 38, 10, 18, 12)
+        THIN("Thin", 22, 4, 14, 9),
+        REGULAR("Regular", 26, 5, 15, 10),
+        LARGE("Large", 30, 7, 16, 10)
     }
 
     /** What can sit on the desktop itself. */
@@ -130,6 +126,16 @@ object DesktopStore {
          */
         val superFill: Boolean = false,
         val thickness: Thickness = Thickness.REGULAR,
+        /**
+         * The display's density, which is the only lever over the size of Android's own controls.
+         *
+         * A window's caption is a fixed number of dp, drawn by the system, and nothing miniMont
+         * does can make it bigger. What can is making the desktop fewer dp across: at 240 the
+         * display is 1067 dp wide and the caption is a small part of it, at 320 it is 800 dp wide
+         * and the same caption is half again as large a share of the screen. Fewer dp is less room
+         * for windows and bigger everything; it is a trade, so it is a setting.
+         */
+        val density: Int = 240,
         /** What is on the desktop: shortcuts and widgets, in the order they were put there. */
         val items: List<Item> = emptyList()
     )
@@ -163,6 +169,7 @@ object DesktopStore {
             thickness = runCatching {
                 Thickness.valueOf(preferences.getString(THICKNESS, null) ?: Thickness.REGULAR.name)
             }.getOrDefault(Thickness.REGULAR),
+            density = preferences.getInt(DENSITY, 240),
             items = preferences.getString(ITEMS, "").orEmpty()
                 .split("\n").mapNotNull { Item.decode(it) }
         )
@@ -338,6 +345,11 @@ object DesktopStore {
         preferences.edit().putBoolean(SUPER_FILL, on).apply()
     }
 
+    fun setDensity(density: Int) {
+        _state.update { it.copy(density = density) }
+        preferences.edit().putInt(DENSITY, density).apply()
+    }
+
     fun setThickness(thickness: Thickness) {
         _state.update { it.copy(thickness = thickness) }
         preferences.edit().putString(THICKNESS, thickness.name).apply()
@@ -409,6 +421,7 @@ object DesktopStore {
     private const val DRAWER_PAGED = "drawer_paged"
     private const val SUPER_FILL = "super_fill"
     private const val THICKNESS = "thickness"
+    private const val DENSITY = "density"
     private const val MIGRATED = "mont_wallpaper_migrated"
     private const val ITEMS = "desktop_items"
     private const val GRID_MIGRATED = "desktop_cells"

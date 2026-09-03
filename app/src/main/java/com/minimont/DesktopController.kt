@@ -185,7 +185,11 @@ class DesktopController private constructor(private val context: Context) {
      * on its own: the display is 1067 by 600 dp instead of 1600 by 900, and the scale is worked out
      * from that. One lever, and both halves of the screen agree afterwards.
      */
-    fun start(width: Int = 1920, height: Int = 1080, density: Int = 240) {
+    fun start(
+        width: Int = 1920,
+        height: Int = 1080,
+        density: Int = com.minimont.desktop.DesktopStore.state.value.density
+    ) {
         scope.launch {
             stop()
             val port = _state.value.connectPort
