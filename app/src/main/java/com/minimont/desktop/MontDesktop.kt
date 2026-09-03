@@ -175,15 +175,16 @@ fun MontDesktop(
 
     Column(Modifier.fillMaxWidth()) {
 
-        // The notification centre opens toward the right, where a shade has always been, and
-        // everything else in the middle above whatever opened it. It still floats clear of the
-        // edge by the bar's own padding — a card held against the side of the screen stops being a
-        // card and becomes a sidebar, which is a different object with different rules.
+        // The two cards that belong to the right end of the bar open toward the right, where a
+        // shade has always been; everything else opens in the middle, above whatever opened it.
+        // Both float clear of the edge by the bar's own padding — a card held against the side of
+        // the screen stops being a card and becomes a sidebar, which is a different object with
+        // different rules.
         val gap = store.thickness.padding.dp * LocalMontScale.current
+        val rightHand = panel == Panel.NOTIFICATIONS || panel == Panel.QUICK
         Box(
             Modifier.fillMaxWidth().padding(horizontal = gap),
-            contentAlignment =
-                if (panel == Panel.NOTIFICATIONS) Alignment.CenterEnd else Alignment.Center
+            contentAlignment = if (rightHand) Alignment.CenterEnd else Alignment.Center
         ) {
 
         when (panel) {
