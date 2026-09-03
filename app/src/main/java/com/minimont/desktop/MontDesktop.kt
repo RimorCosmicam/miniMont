@@ -41,6 +41,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -423,7 +425,19 @@ private fun DesktopCard(
     MontCard(
         Modifier
             .width(width.dp * scale)
-            .heightIn(max = maxHeight.dp * scale),
+            .heightIn(max = maxHeight.dp * scale)
+            // The card swallows every press that lands on it, including the ones on its own empty
+            // margins, so that pressing inside a card is never mistaken for pressing beside one.
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (event.type == PointerEventType.Press) {
+                            event.changes.forEach { it.consume() }
+                        }
+                    }
+                }
+            },
         content = content
     )
 }
