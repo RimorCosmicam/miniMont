@@ -88,9 +88,23 @@ public final class Desktop {
      * and it is a reasonable one: you asked to have it here, and here it is.
      */
     public static boolean spawn(int displayId, String component) {
-        boolean started = start(displayId, component, FREEFORM, false, NEW_TASK | MULTIPLE_TASK);
-        place(packageOf(component));
-        return started;
+        String packageName = packageOf(component);
+        start(displayId, component, FREEFORM, false, NEW_TASK | MULTIPLE_TASK);
+
+        // Checked and corrected, exactly as an ordinary launch is.
+        //
+        // An application whose launcher will not have two tasks ignores the flag and brings its
+        // existing window forward instead — and that window is wherever it already was, which for
+        // Chrome was the cover screen. Asking for a new window and being sent to the phone is not
+        // a reasonable answer to anything.
+        int[] found = settle(packageName);
+        if (found == null) return true;
+        if (found[1] != displayId && !Tasks.moveToDisplay(found[0], displayId)) {
+            Ln.i("DESKTOP", "could not bring " + packageName + " to display " + displayId);
+            return false;
+        }
+        place(packageName);
+        return true;
     }
 
     public static boolean open(int displayId, String action, String data) {

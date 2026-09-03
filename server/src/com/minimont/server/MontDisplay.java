@@ -57,8 +57,32 @@ public final class MontDisplay {
      * that loses its place. It simply has no surface, so nothing composites and nothing encodes.
      */
     public static MontDisplay parked(String name, int width, int height, int dpi) throws Exception {
-        return create(name, width, height, dpi, null, 0, false);
+        // A real surface, small, that nobody ever reads.
+        //
+        // It began with no surface at all, which is tidier and does not work: a display with
+        // nowhere to draw is a display the framework may decide is unusable, and it relocates the
+        // tasks on it to the default display — so a window parked on desktop two turned up on the
+        // phone's cover screen. An eighth-scale reader is a valid target, costs almost nothing, and
+        // the display keeps its full logical size because the surface is only where the pixels go,
+        // not how big the display is.
+        android.media.ImageReader reader = android.media.ImageReader.newInstance(
+                Math.max(1, width / 8), Math.max(1, height / 8),
+                android.graphics.PixelFormat.RGBA_8888, 2);
+        // Emptied as it fills. Nothing looks at these; they are freed so the producer never stalls.
+        // On the main looper, explicitly. A null handler means "this thread's looper", and the
+        // thread that switches desktops has none — so it threw, no parked display was ever made,
+        // and switching desktops quietly did nothing at all.
+        reader.setOnImageAvailableListener(source -> {
+            android.media.Image image = source.acquireLatestImage();
+            if (image != null) image.close();
+        }, new android.os.Handler(android.os.Looper.getMainLooper()));
+        MontDisplay display = create(name, width, height, dpi, reader.getSurface(), 0, false);
+        display.reader = reader;
+        return display;
     }
+
+    /** Held so it is not collected, and closed with the display. */
+    private android.media.ImageReader reader;
 
     /**
      * @param flagOverride the exact flag word to use, or zero to work one out.
@@ -110,6 +134,14 @@ public final class MontDisplay {
     }
 
     public void release() {
+        try {
+            if (reader != null) {
+                reader.close();
+                reader = null;
+            }
+        } catch (Exception ignored) {
+            // A reader that will not close is one the display is taking with it anyway.
+        }
         try {
             display.release();
         } catch (Exception ignored) {
