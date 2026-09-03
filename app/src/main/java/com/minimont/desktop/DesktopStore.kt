@@ -4,6 +4,8 @@ import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlin.math.ceil
+import kotlin.math.roundToInt
 
 /**
  * What the desktop is, between runs.
@@ -137,6 +139,9 @@ object DesktopStore {
         if (::preferences.isInitialized) return
         preferences = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         migrate()
+        // The grid migration runs at the *end* of load, below, once the items it is meant to move
+        // have actually been read. Run here it saw an empty list, moved nothing, and wrote itself
+        // down as done — which is the whole failure mode of a migration that runs too early.
         _state.value = State(
             backdrop = runCatching {
                 Backdrop.valueOf(preferences.getString(BACKDROP, null) ?: Backdrop.MONT.name)
@@ -157,6 +162,7 @@ object DesktopStore {
             items = preferences.getString(ITEMS, "").orEmpty()
                 .split("\n").mapNotNull { Item.decode(it) }
         )
+        migrateToGrid(context)
     }
 
     /**
@@ -168,12 +174,95 @@ object DesktopStore {
      * done, so a mustard chosen *afterwards* is a choice and stays one.
      */
     private fun migrate() {
-        if (preferences.getBoolean(MIGRATED, false)) return
-        preferences.edit().putBoolean(MIGRATED, true).apply()
-        if (preferences.getString(BACKDROP, null) == Backdrop.MUSTARD.name) {
-            preferences.edit().putString(BACKDROP, Backdrop.MONT.name).apply()
+        if (!preferences.getBoolean(MIGRATED, false)) {
+            preferences.edit().putBoolean(MIGRATED, true).apply()
+            if (preferences.getString(BACKDROP, null) == Backdrop.MUSTARD.name) {
+                preferences.edit().putString(BACKDROP, Backdrop.MONT.name).apply()
+            }
         }
     }
+
+    /**
+     * Bring anything placed before the grid existed onto it.
+     *
+     * Dragging has always snapped a position and never a size, so a widget added when the default
+     * was "whatever the provider called its minimum" kept that size for good — 80 by 60 against a
+     * cell of 72, sitting at 40,40 with something else on top of it, and no amount of moving it
+     * about would ever have fixed either. Once, and written down as done.
+     */
+    private fun migrateToGrid(context: Context) {
+        if (preferences.getBoolean(GRID_MIGRATED, false)) return
+        preferences.edit().putBoolean(GRID_MIGRATED, true).apply()
+
+        val taken = mutableSetOf<Pair<Int, Int>>()
+        val moved = _state.value.items.map { item ->
+            // A widget's size is asked of its provider rather than taken from what was written
+            // down. The stored figure is whatever miniMont guessed on the day it was added — and
+            // one of those guesses has already been flattened by an earlier pass of this very
+            // migration. The provider is the only thing that has always known.
+            val wanted = if (item.kind == Kind.WIDGET) providerSize(context, item.widgetId) else null
+            val width = round(wanted?.first ?: item.width, floor = if (item.kind == Kind.WIDGET) CELL * 2 else CELL)
+            val height = round(wanted?.second ?: item.height, floor = CELL)
+            var x = snap(item.x)
+            var y = snap(item.y)
+            // Every cell a thing covers, not just the one it starts in. Checking corners let a
+            // two-cell widget at column nought sit under one starting at column one: neither
+            // shared a top-left, and they overlapped down their whole length.
+            while (cells(x, y, width, height).any { it in taken }) {
+                x += CELL
+                if (x > MARGIN + CELL * 11) {
+                    x = MARGIN
+                    y += CELL
+                }
+            }
+            taken.addAll(cells(x, y, width, height))
+            item.copy(x = x, y = y, width = width, height = height)
+        }
+        if (moved.isEmpty()) return
+        _state.update { it.copy(items = moved) }
+        writeItems()
+    }
+
+    /** Every cell a rectangle stands on. */
+    private fun cells(x: Int, y: Int, width: Int, height: Int): List<Pair<Int, Int>> {
+        val columns = (width / CELL).coerceAtLeast(1)
+        val rows = (height / CELL).coerceAtLeast(1)
+        return buildList {
+            for (column in 0 until columns) {
+                for (row in 0 until rows) add(x + column * CELL to y + row * CELL)
+            }
+        }
+    }
+
+    /** What a widget's provider says it wants, in dp, or null if it will not say. */
+    private fun providerSize(context: Context, widgetId: Int): Pair<Int, Int>? = runCatching {
+        if (widgetId == 0) return null
+        val info = android.appwidget.AppWidgetManager.getInstance(context)
+            .getAppWidgetInfo(widgetId) ?: return null
+        val density = context.resources.displayMetrics.density
+        val cellsWide = if (android.os.Build.VERSION.SDK_INT >= 31) info.targetCellWidth else 0
+        val cellsHigh = if (android.os.Build.VERSION.SDK_INT >= 31) info.targetCellHeight else 0
+        val width = maxOf((info.minWidth / density).toInt(), cellsWide * CELL)
+        val height = maxOf((info.minHeight / density).toInt(), cellsHigh * CELL)
+        width to height
+    }.getOrNull()
+
+    private fun snap(value: Int): Int =
+        MARGIN + (((value - MARGIN).toFloat() / CELL).roundToInt().coerceAtLeast(0)) * CELL
+
+    /**
+     * Up to the next whole cell, never down.
+     *
+     * Rounding to the *nearest* took a hundred-dp widget to seventy-two, which is a widget losing
+     * a quarter of its height to a tidy-up. A size can afford to be generous and cannot afford to
+     * be short: the thing inside it was already clipping.
+     */
+    private fun round(value: Int, floor: Int): Int =
+        maxOf(floor, ceil(value.toFloat() / CELL).toInt().coerceAtLeast(1) * CELL)
+
+    /** The grid's own figures. A cell is an icon and its air; the margin is an icon and a half. */
+    private const val CELL = 72
+    private const val MARGIN = 72
 
     fun setBackdrop(backdrop: Backdrop) {
         _state.update { it.copy(backdrop = backdrop) }
@@ -243,17 +332,17 @@ object DesktopStore {
      * knowing how the desktop lays itself out beyond where the next thing goes.
      */
     fun nextCell(): Pair<Int, Int> {
-        val margin = 72
-        val cell = 72
-        val taken = _state.value.items
+        val occupied = _state.value.items
+            .flatMap { cells(it.x, it.y, it.width, it.height) }
+            .toSet()
         for (row in 0 until 12) {
             for (column in 0 until 12) {
-                val x = margin + column * cell
-                val y = margin + row * cell
-                if (taken.none { it.x == x && it.y == y }) return x to y
+                val x = MARGIN + column * CELL
+                val y = MARGIN + row * CELL
+                if ((x to y) !in occupied) return x to y
             }
         }
-        return margin to margin
+        return MARGIN to MARGIN
     }
 
     /** Put something on the desktop, where it was dropped. */
@@ -303,4 +392,5 @@ object DesktopStore {
     private const val THICKNESS = "thickness"
     private const val MIGRATED = "mont_wallpaper_migrated"
     private const val ITEMS = "desktop_items"
+    private const val GRID_MIGRATED = "desktop_on_grid_4"
 }
