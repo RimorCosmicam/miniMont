@@ -65,22 +65,35 @@ private const val ICON = 48
  * moment the resolution changes, and this way a wrong cell size costs alignment rather than layout.
  */
 private object Grid {
-    const val CELL = 72
+    /**
+     * A cell is wider than it is tall — or rather, taller than it is wide.
+     *
+     * Launcher cells are not square and never have been: a cell holds an icon *and* its name, and a
+     * widget declaring four by one expects a box four cells wide and one cell tall, where that cell
+     * is around a hundred dp. Given a square cell it gets something far shorter than it was drawn
+     * for, and squashes itself into it — which is what "distorted" was.
+     */
+    const val WIDE = 72
+    const val TALL = 96
     const val MARGIN = (ICON * 3) / 2
 
-    fun snap(value: Float, limit: Int): Int {
-        val cells = ((value - MARGIN) / CELL).roundToInt().coerceAtLeast(0)
-        return (MARGIN + cells * CELL).coerceIn(MARGIN, maxOf(MARGIN, limit))
+    fun snapX(value: Float, limit: Int): Int = snap(value, WIDE, limit)
+
+    fun snapY(value: Float, limit: Int): Int = snap(value, TALL, limit)
+
+    private fun snap(value: Float, step: Int, limit: Int): Int {
+        val cells = ((value - MARGIN) / step).roundToInt().coerceAtLeast(0)
+        return (MARGIN + cells * step).coerceIn(MARGIN, maxOf(MARGIN, limit))
     }
 
     /** The first cell nothing is standing in, so two things added in a row do not land on top. */
     fun free(taken: List<DesktopStore.Item>, width: Int, height: Int): Pair<Int, Int> {
-        val columns = ((width - MARGIN * 2) / CELL).coerceAtLeast(1)
-        val rows = ((height - MARGIN * 2) / CELL).coerceAtLeast(1)
+        val columns = ((width - MARGIN * 2) / WIDE).coerceAtLeast(1)
+        val rows = ((height - MARGIN * 2) / TALL).coerceAtLeast(1)
         for (row in 0 until rows) {
             for (column in 0 until columns) {
-                val x = MARGIN + column * CELL
-                val y = MARGIN + row * CELL
+                val x = MARGIN + column * WIDE
+                val y = MARGIN + row * TALL
                 if (taken.none { it.x == x && it.y == y }) return x to y
             }
         }
@@ -138,6 +151,10 @@ fun DesktopItems(
                         if (event.changes.any { it.isConsumed }) continue
 
                         val at = event.changes.firstOrNull()?.position ?: Offset.Zero
+                        // Any press on the wallpaper puts away a widget's menu, whichever button
+                        // it was: a menu you opened on one thing should not survive you reaching
+                        // for another.
+                        menuFor = null
                         if (event.buttons.isSecondaryPressed) {
                             event.changes.forEach { it.consume() }
                             deskMenu = at
@@ -180,8 +197,8 @@ fun DesktopItems(
                             // Snapped when the finger lifts rather than while it moves: an icon
                             // that jumps between cells under the pointer is an icon fighting you.
                             onDragEnd = {
-                                dragX = Grid.snap(dragX, screen.first - Grid.CELL).toFloat()
-                                dragY = Grid.snap(dragY, screen.second - Grid.CELL).toFloat()
+                                dragX = Grid.snapX(dragX, screen.first - Grid.WIDE).toFloat()
+                                dragY = Grid.snapY(dragY, screen.second - Grid.TALL).toFloat()
                                 DesktopStore.moveItem(item.id, dragX.toInt(), dragY.toInt())
                                 moving = null
                             }
@@ -303,8 +320,8 @@ private fun ItemMenu(
                 Spacer(Modifier.height(4.dp))
                 if (options.isEmpty()) MontLabel("One size only", size = 12, alpha = MontWhite.DIM)
                 options.forEach { (columns, rows) ->
-                    val width = columns * Grid.CELL
-                    val height = rows * Grid.CELL
+                    val width = columns * Grid.WIDE
+                    val height = rows * Grid.TALL
                     MontRow(
                         label = "$columns × $rows",
                         active = width == item.width && height == item.height
@@ -338,7 +355,7 @@ private fun Shortcut(item: DesktopStore.Item, onOpen: () -> Unit, onHold: () -> 
         // A launcher's cell is the icon *and* its name; the name ellipsises rather than the cell
         // growing to hold it.
         Modifier
-            .width(Grid.CELL.dp)
+            .width(Grid.WIDE.dp)
             .secondary { onHold() }
             .combinedClickable(onClick = onOpen, onLongClick = onHold),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -389,35 +406,6 @@ private fun Widget(
             }
             return@Box
         }
-        // The corner, for the ones whose provider guessed wrong about how much room they wanted.
-        // A widget is the only thing on this desktop whose right size nobody else can know.
-        Box(
-            Modifier
-                .align(Alignment.BottomEnd)
-                .size(16.dp)
-                .background(Color.White.copy(alpha = MontWhite.BORDER))
-                .pointerInput(item.id) {
-                    detectDragGestures(
-                        onDrag = { change, dragged ->
-                            change.consume()
-                            width = (width + with(density) { dragged.x.toDp().value })
-                                .coerceIn(72f, 720f)
-                            height = (height + with(density) { dragged.y.toDp().value })
-                                .coerceIn(72f, 720f)
-                        },
-                        // Widgets snap to whole cells too, so a row of them lines up even when
-                        // each was dragged to a different size by hand.
-                        onDragEnd = {
-                            width = (Math.round(width / Grid.CELL).coerceAtLeast(1) * Grid.CELL)
-                                .toFloat()
-                            height = (Math.round(height / Grid.CELL).coerceAtLeast(1) * Grid.CELL)
-                                .toFloat()
-                            DesktopStore.resizeItem(item.id, width.toInt(), height.toInt())
-                        }
-                    )
-                }
-        )
-
         AndroidView(
             factory = { viewContext ->
                 val manager = AppWidgetManager.getInstance(viewContext)
@@ -510,17 +498,17 @@ object Widgets {
             ?: return@runCatching emptyList()
         val density = context.resources.displayMetrics.density
 
-        val minColumns = cellsFor(info.minWidth, density)
-        val minRows = cellsFor(info.minHeight, density)
+        val minColumns = cellsFor(info.minWidth, density, WIDE)
+        val minRows = cellsFor(info.minHeight, density, TALL)
         val horizontal = info.resizeMode and AppWidgetProviderInfo.RESIZE_HORIZONTAL != 0
         val vertical = info.resizeMode and AppWidgetProviderInfo.RESIZE_VERTICAL != 0
 
         val maxColumns = if (!horizontal) minColumns else {
-            val declared = cellsFor(info.maxResizeWidth, density)
+            val declared = cellsFor(info.maxResizeWidth, density, WIDE)
             if (declared > minColumns) declared else minColumns + 3
         }
         val maxRows = if (!vertical) minRows else {
-            val declared = cellsFor(info.maxResizeHeight, density)
+            val declared = cellsFor(info.maxResizeHeight, density, TALL)
             if (declared > minRows) declared else minRows + 2
         }
 
@@ -531,9 +519,9 @@ object Widgets {
         }
     }.getOrDefault(emptyList())
 
-    private fun cellsFor(px: Int, density: Float): Int {
+    private fun cellsFor(px: Int, density: Float, step: Int): Int {
         if (px <= 0) return 0
-        return kotlin.math.ceil((px / density) / CELL).toInt().coerceAtLeast(1)
+        return kotlin.math.ceil((px / density) / step).toInt().coerceAtLeast(1)
     }
 
     private fun size(
@@ -549,13 +537,15 @@ object Widgets {
         }
         // A launcher cell is about seventy dp across once its gaps are counted. Two of them is the
         // smallest thing worth putting on a desktop.
-        val fromCells = cells * CELL
-        return maxOf(minimum, fromCells, if (horizontal) CELL * 2 else CELL)
-            .coerceAtMost(560)
+        val step = if (horizontal) WIDE else TALL
+        val fromCells = cells * step
+        return maxOf(minimum, fromCells, if (horizontal) WIDE * 2 else TALL)
+            .coerceAtMost(640)
     }
 
-    /** One launcher cell, near enough, in dp. */
-    private const val CELL = 72
+    /** The same cell the desktop's grid uses, and the same reason it is not square. */
+    private const val WIDE = 72
+    private const val TALL = 96
 
     private fun android.graphics.drawable.Drawable.toBitmap(): ImageBitmap {
         if (this is android.graphics.drawable.BitmapDrawable && bitmap != null) {

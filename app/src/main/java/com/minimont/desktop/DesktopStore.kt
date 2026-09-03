@@ -201,18 +201,22 @@ object DesktopStore {
             // one of those guesses has already been flattened by an earlier pass of this very
             // migration. The provider is the only thing that has always known.
             val wanted = if (item.kind == Kind.WIDGET) providerSize(context, item.widgetId) else null
-            val width = round(wanted?.first ?: item.width, floor = if (item.kind == Kind.WIDGET) CELL * 2 else CELL)
-            val height = round(wanted?.second ?: item.height, floor = CELL)
-            var x = snap(item.x)
-            var y = snap(item.y)
+            val width = round(
+                wanted?.first ?: item.width,
+                floor = if (item.kind == Kind.WIDGET) WIDE * 2 else WIDE,
+                step = WIDE
+            )
+            val height = round(wanted?.second ?: item.height, floor = TALL, step = TALL)
+            var x = snapX(item.x)
+            var y = snapY(item.y)
             // Every cell a thing covers, not just the one it starts in. Checking corners let a
             // two-cell widget at column nought sit under one starting at column one: neither
             // shared a top-left, and they overlapped down their whole length.
             while (cells(x, y, width, height).any { it in taken }) {
-                x += CELL
-                if (x > MARGIN + CELL * 11) {
+                x += WIDE
+                if (x > MARGIN + WIDE * 11) {
                     x = MARGIN
-                    y += CELL
+                    y += TALL
                 }
             }
             taken.addAll(cells(x, y, width, height))
@@ -225,11 +229,11 @@ object DesktopStore {
 
     /** Every cell a rectangle stands on. */
     private fun cells(x: Int, y: Int, width: Int, height: Int): List<Pair<Int, Int>> {
-        val columns = (width / CELL).coerceAtLeast(1)
-        val rows = (height / CELL).coerceAtLeast(1)
+        val columns = (width / WIDE).coerceAtLeast(1)
+        val rows = (height / TALL).coerceAtLeast(1)
         return buildList {
             for (column in 0 until columns) {
-                for (row in 0 until rows) add(x + column * CELL to y + row * CELL)
+                for (row in 0 until rows) add(x + column * WIDE to y + row * TALL)
             }
         }
     }
@@ -242,26 +246,37 @@ object DesktopStore {
         val density = context.resources.displayMetrics.density
         val cellsWide = if (android.os.Build.VERSION.SDK_INT >= 31) info.targetCellWidth else 0
         val cellsHigh = if (android.os.Build.VERSION.SDK_INT >= 31) info.targetCellHeight else 0
-        val width = maxOf((info.minWidth / density).toInt(), cellsWide * CELL)
-        val height = maxOf((info.minHeight / density).toInt(), cellsHigh * CELL)
+        val width = maxOf((info.minWidth / density).toInt(), cellsWide * WIDE)
+        val height = maxOf((info.minHeight / density).toInt(), cellsHigh * TALL)
         width to height
     }.getOrNull()
 
-    private fun snap(value: Int): Int =
-        MARGIN + (((value - MARGIN).toFloat() / CELL).roundToInt().coerceAtLeast(0)) * CELL
+    private fun snapX(value: Int): Int = snap(value, WIDE)
+
+    private fun snapY(value: Int): Int = snap(value, TALL)
+
+    private fun snap(value: Int, step: Int): Int =
+        MARGIN + (((value - MARGIN).toFloat() / step).roundToInt().coerceAtLeast(0)) * step
 
     /**
      * Up to the next whole cell, never down.
      *
-     * Rounding to the *nearest* took a hundred-dp widget to seventy-two, which is a widget losing
-     * a quarter of its height to a tidy-up. A size can afford to be generous and cannot afford to
-     * be short: the thing inside it was already clipping.
+     * Rounding to the nearest took a hundred-dp widget to seventy-two, which is a widget losing a
+     * quarter of its height to a tidy-up. A size can afford to be generous and cannot afford to be
+     * short: the thing inside it was already clipping.
      */
-    private fun round(value: Int, floor: Int): Int =
-        maxOf(floor, ceil(value.toFloat() / CELL).toInt().coerceAtLeast(1) * CELL)
+    private fun round(value: Int, floor: Int, step: Int): Int =
+        maxOf(floor, ceil(value.toFloat() / step).toInt().coerceAtLeast(1) * step)
 
-    /** The grid's own figures. A cell is an icon and its air; the margin is an icon and a half. */
-    private const val CELL = 72
+    /**
+     * The grid's own figures. The margin is an icon and a half; a cell is not square.
+     *
+     * A launcher cell holds an icon and its name and is taller than it is wide, and a widget that
+     * declares four by one expects that shape. Square cells gave it a box far shorter than it was
+     * drawn for, and it squashed itself into it.
+     */
+    private const val WIDE = 72
+    private const val TALL = 96
     private const val MARGIN = 72
 
     fun setBackdrop(backdrop: Backdrop) {
@@ -337,8 +352,8 @@ object DesktopStore {
             .toSet()
         for (row in 0 until 12) {
             for (column in 0 until 12) {
-                val x = MARGIN + column * CELL
-                val y = MARGIN + row * CELL
+                val x = MARGIN + column * WIDE
+                val y = MARGIN + row * TALL
                 if ((x to y) !in occupied) return x to y
             }
         }
@@ -392,5 +407,5 @@ object DesktopStore {
     private const val THICKNESS = "thickness"
     private const val MIGRATED = "mont_wallpaper_migrated"
     private const val ITEMS = "desktop_items"
-    private const val GRID_MIGRATED = "desktop_on_grid_4"
+    private const val GRID_MIGRATED = "desktop_cells"
 }
