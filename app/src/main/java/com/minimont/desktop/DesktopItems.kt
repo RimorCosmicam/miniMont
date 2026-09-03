@@ -412,10 +412,38 @@ private fun Widget(
             }
             return@Box
         }
+        // Rebuilt when the size changes, on purpose.
+        //
+        // A host view that is merely told a new size stretches what it already has and pads the
+        // rest — the provider drew a four by one layout and is now filling a four by two box with
+        // it. RemoteViews for a different size come from the provider, and it only sends them when
+        // its options change, so the options are set and the view is built again from scratch.
+        key(item.width, item.height) {
         AndroidView(
             factory = { viewContext ->
                 val manager = AppWidgetManager.getInstance(viewContext)
                 val info = manager.getAppWidgetInfo(item.widgetId)
+                // Told before the view exists, so the first RemoteViews it receives are already
+                // the ones for this size rather than the ones for the last.
+                runCatching {
+                    manager.updateAppWidgetOptions(
+                        item.widgetId,
+                        android.os.Bundle().apply {
+                            putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, item.width)
+                            putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, item.height)
+                            putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, item.width)
+                            putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, item.height)
+                            if (android.os.Build.VERSION.SDK_INT >= 31) {
+                                putParcelableArrayList(
+                                    AppWidgetManager.OPTION_APPWIDGET_SIZES,
+                                    arrayListOf(
+                                        android.util.SizeF(item.width.toFloat(), item.height.toFloat())
+                                    )
+                                )
+                            }
+                        }
+                    )
+                }
                 (host.createView(viewContext, item.widgetId, info) as AppWidgetHostView).apply {
                     // A host view arrives with its provider's own padding on it, which on a
                     // desktop is somebody else's margin inside our rectangle.
@@ -444,6 +472,7 @@ private fun Widget(
                 }
             }
         )
+        }
     }
 }
 

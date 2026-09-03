@@ -69,7 +69,9 @@ private enum class Surface { PAD, KEYS, AIRMATE }
 @Composable
 fun CoverScreen(controller: DesktopController, onStop: () -> Unit) {
     val context = LocalContext.current
-    val preferences = remember { UserPreferences() }
+    // Natural scrolling: two fingers move the content, not the view of it. The same way the
+    // desktop it is driving has always worked on every machine anybody switched here from.
+    val preferences = remember { UserPreferences(naturalScrolling = true) }
     val haptics = remember { HapticFeedbackManager(context) }
 
     var surface by remember { mutableStateOf(Surface.PAD) }
