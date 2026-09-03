@@ -8,6 +8,7 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProviderInfo
 import android.content.ComponentName
 import android.content.Context
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -45,6 +46,10 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import androidx.compose.ui.viewinterop.AndroidView
 import com.minimont.DesktopController
+import androidx.compose.material3.Text
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import com.minimont.ui.mont.Mont
 import com.minimont.ui.mont.MontLabel
 import com.minimont.ui.mont.MontRow
 import com.minimont.ui.mont.MontSurface
@@ -120,7 +125,10 @@ fun DesktopItems(
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
     val screen = configuration.screenWidthDp to configuration.screenHeightDp
-    var menuFor by remember { mutableStateOf<DesktopStore.Item?>(null) }
+    // The item whose menu is open, and where the pointer was when it opened. A menu belongs under
+    // the cursor: put it under the *element* and it lands somewhere you were not looking, and for a
+    // widget five cells wide that is a long way from the hand that asked for it.
+    var menuFor by remember { mutableStateOf<Pair<DesktopStore.Item, Offset>?>(null) }
     // Which item is in move mode. A widget is a live thing with its own buttons, so dragging it by
     // touching it means every attempt to move one is also an attempt to press what is under the
     // finger — which is why moving is asked for first and only then does a drag mean anything.
@@ -169,6 +177,28 @@ fun DesktopItems(
                 }
             }
     ) {
+        // The grid itself, and only while something is being moved. A desktop with its lattice
+        // permanently drawn on it is a spreadsheet; a desktop with no lattice at all is somewhere
+        // you drop things and hope. It appears when it is the thing you are thinking about.
+        if (moving != null) {
+            Canvas(Modifier.fillMaxSize()) {
+                val wide = Grid.WIDE.dp.toPx()
+                val tall = Grid.TALL.dp.toPx()
+                val margin = Grid.MARGIN.dp.toPx()
+                val line = Color.Black.copy(alpha = .55f)
+                var x = margin
+                while (x <= size.width) {
+                    drawLine(line, Offset(x, margin), Offset(x, size.height - margin), 1f)
+                    x += wide
+                }
+                var y = margin
+                while (y <= size.height) {
+                    drawLine(line, Offset(margin, y), Offset(size.width - margin, y), 1f)
+                    y += tall
+                }
+            }
+        }
+
         // Keyed by identity, not by position in the list.
         //
         // Without this, removing one item made the next one take its slot in the composition — and
@@ -205,18 +235,23 @@ fun DesktopItems(
                         )
                     }
             ) {
-                when (item.kind) {
+                if (moving == item.id) {
+                    // The thing being moved is covered while it moves. A widget dragged by its own
+                    // face is a widget you are also pressing, and a live one under the finger makes
+                    // it impossible to see where its edges have got to.
+                    MovingCard(item)
+                } else when (item.kind) {
                     DesktopStore.Kind.APP -> Shortcut(
                         item = item,
                         onOpen = { onOpen(item.component) },
-                        onHold = { menuFor = item }
+                        onHold = { at -> menuFor = item to at }
                     )
 
                     DesktopStore.Kind.WIDGET -> Widget(
                         item = item,
                         host = host,
                         moving = moving == item.id,
-                        onHold = { menuFor = item }
+                        onHold = { at -> menuFor = item to at }
                     )
                 }
             }
@@ -255,9 +290,10 @@ fun DesktopItems(
             }
         }
 
-        menuFor?.let { item ->
+        menuFor?.let { (item, at) ->
             ItemMenu(
                 item = item,
+                at = at,
                 density = density,
                 onMove = {
                     moving = item.id
@@ -281,6 +317,34 @@ fun DesktopItems(
 }
 
 /**
+ * What stands in for something while it is being moved.
+ *
+ * A Mont surface the size of the thing itself, with the one word that says what is happening on a
+ * white block in the middle of it — white being the language's active, and this being the only
+ * thing on the desktop that is currently doing anything.
+ */
+@Composable
+private fun MovingCard(item: DesktopStore.Item) {
+    Box(
+        Modifier
+            .size(item.width.dp, item.height.dp)
+            .background(MontSurface),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(Modifier.background(Color.White).padding(horizontal = 10.dp, vertical = 4.dp)) {
+            Text(
+                "MOVE",
+                color = Color.Black,
+                fontFamily = Mont,
+                fontWeight = FontWeight.Black,
+                fontSize = 13.sp,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+/**
  * What can be done to something on the desktop.
  *
  * Resize offers the sizes the widget itself says it will take, in cells, rather than a free drag —
@@ -290,6 +354,8 @@ fun DesktopItems(
 @Composable
 private fun ItemMenu(
     item: DesktopStore.Item,
+    /** Where the pointer was, in the desktop's own dp. */
+    at: Offset,
     density: androidx.compose.ui.unit.Density,
     onMove: () -> Unit,
     onResize: (Int, Int) -> Unit,
@@ -306,8 +372,8 @@ private fun ItemMenu(
         Modifier
             .offset {
                 IntOffset(
-                    with(density) { item.x.dp.roundToPx() },
-                    with(density) { (item.y + item.height + 6).dp.roundToPx() }
+                    with(density) { at.x.dp.roundToPx() },
+                    with(density) { at.y.dp.roundToPx() }
                 )
             }
             .background(MontSurface)
@@ -343,7 +409,11 @@ private fun ItemMenu(
 }
 
 @Composable
-private fun Shortcut(item: DesktopStore.Item, onOpen: () -> Unit, onHold: () -> Unit) {
+private fun Shortcut(
+    item: DesktopStore.Item,
+    onOpen: () -> Unit,
+    onHold: (Offset) -> Unit
+) {
     val context = LocalContext.current
     val app = remember(item.component) {
         AppCatalog.byPackage(context, item.component.substringBefore('/'))
@@ -356,8 +426,11 @@ private fun Shortcut(item: DesktopStore.Item, onOpen: () -> Unit, onHold: () -> 
         // growing to hold it.
         Modifier
             .width(Grid.WIDE.dp)
-            .secondary { onHold() }
-            .combinedClickable(onClick = onOpen, onLongClick = onHold),
+            .secondary { at -> onHold(Offset(item.x + at.x, item.y + at.y)) }
+            .combinedClickable(
+                onClick = onOpen,
+                onLongClick = { onHold(Offset(item.x.toFloat(), item.y.toFloat())) }
+            ),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         val icon = app?.icon
@@ -385,7 +458,7 @@ private fun Widget(
     item: DesktopStore.Item,
     host: AppWidgetHost?,
     moving: Boolean,
-    onHold: () -> Unit
+    onHold: (Offset) -> Unit
 ) {
     val context = LocalContext.current
 
@@ -403,8 +476,11 @@ private fun Widget(
             .size(width.dp, height.dp)
             // Right click and hold reach the widget's own menu. A plain tap is left to the widget,
             // which usually has something of its own to do with it.
-            .secondary { onHold() }
-            .combinedClickable(onClick = {}, onLongClick = onHold)
+            .secondary { at -> onHold(Offset(item.x + at.x, item.y + at.y)) }
+            .combinedClickable(
+                onClick = {},
+                onLongClick = { onHold(Offset(item.x.toFloat(), item.y.toFloat())) }
+            )
     ) {
         if (host == null || item.widgetId == 0) {
             Box(Modifier.fillMaxSize().background(MontSurface)) {
