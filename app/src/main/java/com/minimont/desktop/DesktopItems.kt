@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -63,7 +64,19 @@ fun DesktopItems(
     val density = LocalDensity.current
     var menuFor by remember { mutableStateOf<DesktopStore.Item?>(null) }
 
-    Box(Modifier.fillMaxSize()) {
+    var deskMenu by remember { mutableStateOf<Offset?>(null) }
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            // The desktop itself answers a right click. A long press on the wallpaper does the
+            // same, for the tablet, which has fingers and no second button.
+            .secondary { at -> deskMenu = at }
+            .combinedClickable(
+                onClick = { deskMenu = null },
+                onLongClick = { deskMenu = Offset.Zero }
+            )
+    ) {
         items.forEach { item ->
             var dragX by remember(item.id) { mutableStateOf(item.x.toFloat()) }
             var dragY by remember(item.id) { mutableStateOf(item.y.toFloat()) }
@@ -98,6 +111,39 @@ fun DesktopItems(
                         host = host,
                         onHold = { menuFor = item }
                     )
+                }
+            }
+        }
+
+        deskMenu?.let { at ->
+            Box(
+                Modifier
+                    .offset {
+                        IntOffset(
+                            with(density) { at.x.toDp().roundToPx() },
+                            with(density) { at.y.toDp().roundToPx() }
+                        )
+                    }
+                    .background(MontSurface)
+                    .width(220.dp)
+                    .padding(start = 14.dp, top = 8.dp, end = 10.dp, bottom = 8.dp)
+            ) {
+                Column {
+                    // The cards these open live in the chrome window, above every application, so
+                    // the backdrop asks for one rather than drawing it down here under everything.
+                    MontRow(label = "Add a widget") {
+                        DesktopRequests.ask(DesktopRequests.Panel.WIDGETS)
+                        deskMenu = null
+                    }
+                    MontRow(label = "Change the wallpaper") {
+                        DesktopRequests.ask(DesktopRequests.Panel.WALLPAPER)
+                        deskMenu = null
+                    }
+                    MontRow(label = "Settings") {
+                        DesktopRequests.ask(DesktopRequests.Panel.SETTINGS)
+                        deskMenu = null
+                    }
+                    MontRow(label = "Cancel", active = false) { deskMenu = null }
                 }
             }
         }

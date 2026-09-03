@@ -393,6 +393,15 @@ public final class Server {
             session.execute(() -> {
                 if (display != null) Desktop.keepOffTheBar(display.id(), width, height);
             });
+
+            // The floor, put back if it has gone.
+            //
+            // Everything on this display stands on the backdrop: the wallpaper, the icons, the
+            // widgets, and the only thing the pointer has to hover over when no app is open. Lose
+            // it and the desktop is a black rectangle where launches land oddly and the cursor
+            // wanders. It should never go now that back no longer closes it, but a desktop that
+            // cannot survive losing its floor is one bad key away from needing a restart.
+            if (tick % 3 == 0) session.execute(this::keepTheFloor);
             // Every fifth tick, in frames per second rather than a running total: "no picture" has
             // several causes that look identical from here, and the rate tells them apart — nothing
             // encoded is a dead display, encoded but dropped is a socket that will not take them.
@@ -404,6 +413,14 @@ public final class Server {
                 previous = encoded;
             }
         }
+    }
+
+    private void keepTheFloor() {
+        if (display == null || backdrop.isEmpty()) return;
+        int[] found = Tasks.find(OURS);
+        if (found != null && found[1] == display.id()) return;
+        Ln.i("HOST", "the backdrop is gone; putting it back");
+        Desktop.backdrop(display.id(), backdrop);
     }
 
     private void startSession() {

@@ -40,9 +40,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -103,40 +100,6 @@ private object Phone {
 }
 
 /**
- * A second-button press, and the long press that stands in for it.
- *
- * The desktop has a real mouse now, so the taskbar answers a right click the way everything else on
- * a desktop does. It also answers a long press, because the tablet at the other end has fingers and
- * no second button, and an action that exists only for one of the two input devices is an action
- * half the users cannot reach.
- */
-private fun Modifier.secondary(onClick: () -> Unit): Modifier = this.pointerInput(onClick) {
-    awaitPointerEventScope {
-        while (true) {
-            val event = awaitPointerEvent(PointerEventPass.Initial)
-            if (event.type != PointerEventType.Press || !event.buttons.isSecondaryPressed) continue
-
-            event.changes.forEach { it.consume() }
-            onClick()
-
-            // Swallow the rest of the gesture, not just the press that started it.
-            //
-            // Consuming only the press left the release for the ordinary click handler, which then
-            // did what a left click does — so the menu opened on the press and was closed again by
-            // its own release, a frame later. Everything until the last finger lifts belongs to
-            // this gesture, and the Initial pass is where to take it: before anything else has
-            // looked at it.
-            var pressed = true
-            while (pressed) {
-                val rest = awaitPointerEvent(PointerEventPass.Initial)
-                rest.changes.forEach { it.consume() }
-                pressed = rest.changes.any { it.pressed }
-            }
-        }
-    }
-}
-
-/**
  * Everything miniMont draws above the windows: the dock, the status card, and whatever card is
  * open above them.
  *
@@ -165,6 +128,26 @@ fun MontDesktop(
     val store by DesktopStore.state.collectAsState()
     var panel by remember { mutableStateOf(Panel.NONE) }
     var selected by remember { mutableStateOf<DesktopApp?>(null) }
+    var section by remember { mutableStateOf(Section.WALLPAPER) }
+
+    // The desktop's own menu is drawn in the backdrop, at the bottom of the window stack, and the
+    // cards it asks for belong up here. It says which one it wants; this opens it.
+    val asked by DesktopRequests.asked.collectAsState()
+    LaunchedEffect(asked) {
+        when (asked) {
+            DesktopRequests.Panel.WIDGETS -> {
+                section = Section.DESKTOP
+                panel = Panel.SETTINGS
+            }
+            DesktopRequests.Panel.WALLPAPER -> {
+                section = Section.WALLPAPER
+                panel = Panel.SETTINGS
+            }
+            DesktopRequests.Panel.SETTINGS -> panel = Panel.SETTINGS
+            null -> return@LaunchedEffect
+        }
+        DesktopRequests.answered()
+    }
 
     val apps = remember { AppCatalog.apps(context) }
 
@@ -221,6 +204,8 @@ fun MontDesktop(
             Panel.SETTINGS -> SettingsCard(
                 state = store,
                 notifications = Notifications.granted(context),
+                section = section,
+                onSection = { section = it },
                 onPickImage = {
                     panel = Panel.NONE
                     onPickImage()
@@ -544,12 +529,13 @@ private enum class Section(val label: String) {
 private fun SettingsCard(
     state: DesktopStore.State,
     notifications: Boolean,
+    section: Section,
+    onSection: (Section) -> Unit,
     onPickImage: () -> Unit,
     onGrantNotifications: () -> Unit,
     onClose: () -> Unit
 ) {
     val scale = LocalMontScale.current
-    var section by remember { mutableStateOf(Section.WALLPAPER) }
 
     DesktopCard(width = 560, maxHeight = 400) {
         MontLabel("SETTINGS", size = 16, alpha = MontWhite.PRIMARY)
@@ -561,7 +547,7 @@ private fun SettingsCard(
                     MontRow(
                         label = candidate.label,
                         active = candidate == section
-                    ) { section = candidate }
+                    ) { onSection(candidate) }
                 }
             }
             Spacer(Modifier.width(22.dp * scale))
@@ -1003,7 +989,7 @@ private fun DockItem(
     val scale = LocalMontScale.current
     Column(
         Modifier
-            .secondary(onHold)
+            .secondary { onHold() }
             .combinedClickable(onClick = onClick, onLongClick = onHold),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -1074,7 +1060,7 @@ private fun StatusBlock(
             Bubble(
                 count = notes.size,
                 modifier = Modifier
-                    .secondary(onNotificationMenu)
+                    .secondary { onNotificationMenu() }
                     .combinedClickable(
                         onClick = onNotifications,
                         onLongClick = onNotificationMenu
@@ -1084,7 +1070,7 @@ private fun StatusBlock(
 
         Row(
             Modifier
-                .secondary(onBatteryMenu)
+                .secondary { onBatteryMenu() }
                 .combinedClickable(onClick = onBattery, onLongClick = onBatteryMenu),
             horizontalArrangement = Arrangement.spacedBy(5.dp * scale),
             verticalAlignment = Alignment.CenterVertically
@@ -1095,7 +1081,7 @@ private fun StatusBlock(
 
         Column(
             Modifier
-                .secondary(onClockMenu)
+                .secondary { onClockMenu() }
                 .combinedClickable(onClick = onClock, onLongClick = onClockMenu),
             horizontalAlignment = Alignment.End
         ) {

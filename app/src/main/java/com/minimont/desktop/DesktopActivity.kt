@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -51,6 +52,15 @@ class DesktopActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         DesktopStore.load(this)
+
+        // Back does nothing here, because there is nowhere behind a desktop.
+        //
+        // It was finishing this activity, which is the wallpaper and everything standing on it — so
+        // pressing back with no window focused took the desktop away and left a black display. The
+        // key still reaches whatever app has focus; it just stops meaning "close the floor".
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() = Unit
+        })
         // The widget host lives with the backdrop, because the backdrop is what widgets are drawn
         // on and its lifetime is theirs: started when the desktop appears, stopped when it goes.
         host = AppWidgetHost(this, Widgets.HOST_ID)
