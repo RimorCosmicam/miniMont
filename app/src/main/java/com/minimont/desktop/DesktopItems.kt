@@ -5,6 +5,7 @@ package com.minimont.desktop
 import android.appwidget.AppWidgetHost
 import android.appwidget.AppWidgetHostView
 import android.appwidget.AppWidgetManager
+import android.appwidget.AppWidgetProviderInfo
 import android.content.ComponentName
 import android.content.Context
 import androidx.compose.foundation.Image
@@ -104,6 +105,10 @@ fun DesktopItems(
     val configuration = LocalConfiguration.current
     val screen = configuration.screenWidthDp to configuration.screenHeightDp
     var menuFor by remember { mutableStateOf<DesktopStore.Item?>(null) }
+    // Which item is in move mode. A widget is a live thing with its own buttons, so dragging it by
+    // touching it means every attempt to move one is also an attempt to press what is under the
+    // finger — which is why moving is asked for first and only then does a drag mean anything.
+    var moving by remember { mutableStateOf<String?>(null) }
 
     var deskMenu by remember { mutableStateOf<Offset?>(null) }
 
@@ -128,10 +133,13 @@ fun DesktopItems(
             var dragX by remember(item.id) { mutableStateOf(item.x.toFloat()) }
             var dragY by remember(item.id) { mutableStateOf(item.y.toFloat()) }
 
+            val draggable = item.kind == DesktopStore.Kind.APP || moving == item.id
+
             Box(
                 Modifier
                     .offset { IntOffset(with(density) { dragX.dp.roundToPx() }, with(density) { dragY.dp.roundToPx() }) }
-                    .pointerInput(item.id) {
+                    .pointerInput(item.id, draggable) {
+                        if (!draggable) return@pointerInput
                         detectDragGestures(
                             onDrag = { change, dragged ->
                                 change.consume()
@@ -146,6 +154,7 @@ fun DesktopItems(
                                 dragX = Grid.snap(dragX, screen.first - Grid.CELL).toFloat()
                                 dragY = Grid.snap(dragY, screen.second - Grid.CELL).toFloat()
                                 DesktopStore.moveItem(item.id, dragX.toInt(), dragY.toInt())
+                                moving = null
                             }
                         )
                     }
@@ -160,6 +169,7 @@ fun DesktopItems(
                     DesktopStore.Kind.WIDGET -> Widget(
                         item = item,
                         host = host,
+                        moving = moving == item.id,
                         onHold = { menuFor = item }
                     )
                 }
@@ -200,27 +210,87 @@ fun DesktopItems(
         }
 
         menuFor?.let { item ->
-            Box(
-                Modifier
-                    .offset {
-                        IntOffset(
-                            with(density) { item.x.dp.roundToPx() },
-                            with(density) { (item.y + ICON + 12).dp.roundToPx() }
-                        )
+            ItemMenu(
+                item = item,
+                density = density,
+                onMove = {
+                    moving = item.id
+                    menuFor = null
+                },
+                onResize = { width, height ->
+                    DesktopStore.resizeItem(item.id, width, height)
+                    menuFor = null
+                },
+                onRemove = {
+                    if (item.kind == DesktopStore.Kind.WIDGET && item.widgetId != 0) {
+                        runCatching { host?.deleteAppWidgetId(item.widgetId) }
                     }
-                    .background(MontSurface)
-                    .width(200.dp)
-            ) {
-                Column(Modifier.padding(start = 14.dp, top = 8.dp, end = 10.dp, bottom = 8.dp)) {
-                    MontRow(label = "Remove from the desktop") {
-                        if (item.kind == DesktopStore.Kind.WIDGET && item.widgetId != 0) {
-                            runCatching { host?.deleteAppWidgetId(item.widgetId) }
-                        }
-                        DesktopStore.removeItem(item.id)
-                        menuFor = null
-                    }
-                    MontRow(label = "Cancel", active = false) { menuFor = null }
+                    DesktopStore.removeItem(item.id)
+                    menuFor = null
+                },
+                onDismiss = { menuFor = null }
+            )
+        }
+    }
+}
+
+/**
+ * What can be done to something on the desktop.
+ *
+ * Resize offers the sizes the widget itself says it will take, in cells, rather than a free drag —
+ * a provider that declares four by two and no more will letterbox itself into anything else, and
+ * offering a size it refuses is offering a broken widget.
+ */
+@Composable
+private fun ItemMenu(
+    item: DesktopStore.Item,
+    density: androidx.compose.ui.unit.Density,
+    onMove: () -> Unit,
+    onResize: (Int, Int) -> Unit,
+    onRemove: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    var choosing by remember(item.id) { mutableStateOf(false) }
+    val options: List<Pair<Int, Int>> = remember(item.id, choosing) {
+        if (choosing) Widgets.sizes(context, item.widgetId) else emptyList()
+    }
+
+    Box(
+        Modifier
+            .offset {
+                IntOffset(
+                    with(density) { item.x.dp.roundToPx() },
+                    with(density) { (item.y + item.height + 6).dp.roundToPx() }
+                )
+            }
+            .background(MontSurface)
+            .width(220.dp)
+            .padding(start = 14.dp, top = 8.dp, end = 10.dp, bottom = 8.dp)
+    ) {
+        Column {
+            if (choosing) {
+                MontLabel("SIZE", size = 11, alpha = MontWhite.DETAIL)
+                Spacer(Modifier.height(4.dp))
+                if (options.isEmpty()) MontLabel("One size only", size = 12, alpha = MontWhite.DIM)
+                options.forEach { (columns, rows) ->
+                    val width = columns * Grid.CELL
+                    val height = rows * Grid.CELL
+                    MontRow(
+                        label = "$columns × $rows",
+                        active = width == item.width && height == item.height
+                    ) { onResize(width, height) }
                 }
+                Spacer(Modifier.height(6.dp))
+                MontRow(label = "Back", active = false) { choosing = false }
+            } else {
+                if (item.kind == DesktopStore.Kind.WIDGET) {
+                    MontRow(label = "Resize") { choosing = true }
+                }
+                MontRow(label = "Move") { onMove() }
+                MontRow(label = "Remove from the desktop") { onRemove() }
+                Spacer(Modifier.height(6.dp))
+                MontRow(label = "Cancel", active = false) { onDismiss() }
             }
         }
     }
@@ -240,6 +310,7 @@ private fun Shortcut(item: DesktopStore.Item, onOpen: () -> Unit, onHold: () -> 
         // growing to hold it.
         Modifier
             .width(Grid.CELL.dp)
+            .secondary { onHold() }
             .combinedClickable(onClick = onOpen, onLongClick = onHold),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -264,7 +335,12 @@ private fun Shortcut(item: DesktopStore.Item, onOpen: () -> Unit, onHold: () -> 
  * Compose equivalent of that and never will be.
  */
 @Composable
-private fun Widget(item: DesktopStore.Item, host: AppWidgetHost?, onHold: () -> Unit) {
+private fun Widget(
+    item: DesktopStore.Item,
+    host: AppWidgetHost?,
+    moving: Boolean,
+    onHold: () -> Unit
+) {
     val context = LocalContext.current
     val density = LocalDensity.current
     var width by remember(item.id) { mutableStateOf(item.width.toFloat()) }
@@ -273,6 +349,9 @@ private fun Widget(item: DesktopStore.Item, host: AppWidgetHost?, onHold: () -> 
     Box(
         Modifier
             .size(width.dp, height.dp)
+            // Right click and hold reach the widget's own menu. A plain tap is left to the widget,
+            // which usually has something of its own to do with it.
+            .secondary { onHold() }
             .combinedClickable(onClick = {}, onLongClick = onHold)
     ) {
         if (host == null || item.widgetId == 0) {
@@ -389,6 +468,45 @@ object Widgets {
      * So the cell count is used where the provider gives one, at the size a cell actually is, and
      * the minimum is only a floor under that.
      */
+    /**
+     * The sizes a widget will actually take, in whole cells.
+     *
+     * Read from the provider rather than offered freely: one that declares four by two and refuses
+     * to resize will letterbox itself into anything else, and offering a size a widget rejects is
+     * offering a broken widget. Its resize flags say which way it will stretch at all.
+     */
+    fun sizes(context: Context, widgetId: Int): List<Pair<Int, Int>> = runCatching {
+        if (widgetId == 0) return@runCatching emptyList()
+        val info = AppWidgetManager.getInstance(context).getAppWidgetInfo(widgetId)
+            ?: return@runCatching emptyList()
+        val density = context.resources.displayMetrics.density
+
+        val minColumns = cellsFor(info.minWidth, density)
+        val minRows = cellsFor(info.minHeight, density)
+        val horizontal = info.resizeMode and AppWidgetProviderInfo.RESIZE_HORIZONTAL != 0
+        val vertical = info.resizeMode and AppWidgetProviderInfo.RESIZE_VERTICAL != 0
+
+        val maxColumns = if (!horizontal) minColumns else {
+            val declared = cellsFor(info.maxResizeWidth, density)
+            if (declared > minColumns) declared else minColumns + 3
+        }
+        val maxRows = if (!vertical) minRows else {
+            val declared = cellsFor(info.maxResizeHeight, density)
+            if (declared > minRows) declared else minRows + 2
+        }
+
+        buildList {
+            for (columns in minColumns..maxColumns.coerceAtMost(minColumns + 5)) {
+                for (rows in minRows..maxRows.coerceAtMost(minRows + 3)) add(columns to rows)
+            }
+        }
+    }.getOrDefault(emptyList())
+
+    private fun cellsFor(px: Int, density: Float): Int {
+        if (px <= 0) return 0
+        return kotlin.math.ceil((px / density) / CELL).toInt().coerceAtLeast(1)
+    }
+
     private fun size(
         info: android.appwidget.AppWidgetProviderInfo,
         density: Float,
