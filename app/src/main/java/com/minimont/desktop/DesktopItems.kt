@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -131,7 +132,13 @@ fun DesktopItems(
                 )
             }
     ) {
-        items.forEach { item ->
+        // Keyed by identity, not by position in the list.
+        //
+        // Without this, removing one item made the next one take its slot in the composition — and
+        // an AndroidView's factory runs once, so the surviving widget inherited the host view of
+        // the deleted one, bound to a widget id that no longer existed. It stopped drawing, which
+        // looked exactly like removing one had removed two.
+        items.forEach { item -> key(item.id) {
             var dragX by remember(item.id) { mutableStateOf(item.x.toFloat()) }
             var dragY by remember(item.id) { mutableStateOf(item.y.toFloat()) }
 
@@ -176,7 +183,7 @@ fun DesktopItems(
                     )
                 }
             }
-        }
+        } }
 
         deskMenu?.let { at ->
             Box(
