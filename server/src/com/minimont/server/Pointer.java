@@ -158,6 +158,13 @@ public final class Pointer {
             buttons &= ~mask;
             motion(MotionEvent.ACTION_BUTTON_RELEASE, buttons, mask);
             motion(MotionEvent.ACTION_UP, buttons, 0);
+            // Forgotten once nothing is held.
+            //
+            // It was kept, so every event after the first click carried the downTime of that first
+            // click — minutes old by the second one. A gesture whose down began several minutes ago
+            // is not a click to anything that measures one, which is why clicks worked and then
+            // quietly stopped.
+            if (buttons == 0) downTime = 0;
             // Back to hovering, so the thing under the cursor lights up again the moment it is
             // released rather than the next time the finger moves.
             motion(MotionEvent.ACTION_HOVER_MOVE, 0, 0);

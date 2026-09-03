@@ -13,6 +13,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -371,13 +372,24 @@ class DesktopController private constructor(private val context: Context) {
     private val _cursor = MutableStateFlow(0f to 0f)
     val cursor = _cursor.asStateFlow()
 
-    /** Relative pointer movement, as the touchpad produces it. */
+    /**
+     * Relative movement in, absolute position out.
+     *
+     * There were two cursors: the one this end draws and the one the host injects, each keeping its
+     * own position from the same deltas. Two counters agree until one of them misses something —
+     * a dropped line, a restarted app, a clamp at an edge one of them reached first — and after
+     * that the arrow is drawn in one place and the click lands in another. Nothing tells you; you
+     * simply start missing what you aim at.
+     *
+     * So there is one position now, kept here because this is the end that draws it, and the host
+     * is told where the pointer *is* rather than how far it moved.
+     */
     fun move(dx: Float, dy: Float) {
-        send("m ${dx.round()} ${dy.round()}")
         val (width, height) = _state.value.size ?: return
-        _cursor.update { (x, y) ->
+        val moved = _cursor.updateAndGet { (x, y) ->
             (x + dx).coerceIn(0f, width - 1f) to (y + dy).coerceIn(0f, height - 1f)
         }
+        send("p ${moved.first.round()} ${moved.second.round()}")
     }
 
     /** A mouse button, held for exactly as long as the finger is. 1 left, 2 right, 3 middle. */

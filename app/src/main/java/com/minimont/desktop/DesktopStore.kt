@@ -34,8 +34,12 @@ object DesktopStore {
     /**
      * How thick the taskbar is.
      *
-     * Three steps, and small ones. The bar's height is set by the tallest thing in it, which is the
-     * clock stack and not the icons — so a thickness that only changed the icons would change
+     * Three steps, and every one of them bigger than it used to be. These are targets before they
+     * are decoration: the display is a thousand dp across, the pointer arrives over a network from
+     * a thumb on a three-inch pad, and twenty-six dp of icon was something you aimed at twice.
+     *
+     * The bar's height is set by the tallest thing in it, which is the clock stack and not the
+     * icons — so a thickness that only changed the icons would change
      * nothing at all. Each step moves the icons, the padding and the type together, and the type
      * never goes below the sizes Mont already uses for a clock and an explanatory line, because a
      * thinner bar you cannot read the date on is not a thinner bar, it is a broken one.
@@ -47,9 +51,9 @@ object DesktopStore {
         val time: Int,
         val date: Int
     ) {
-        THIN("Thin", 22, 4, 14, 9),
-        REGULAR("Regular", 26, 5, 15, 10),
-        LARGE("Large", 30, 7, 16, 10)
+        THIN("Thin", 26, 6, 15, 10),
+        REGULAR("Regular", 32, 8, 16, 11),
+        LARGE("Large", 38, 10, 18, 12)
     }
 
     /** What can sit on the desktop itself. */

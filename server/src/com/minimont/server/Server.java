@@ -237,7 +237,7 @@ public final class Server {
     private static boolean hot(String line) {
         if (line.length() < 2 || line.charAt(1) != ' ') return false;
         switch (line.charAt(0)) {
-            case 'm': case 'b': case 'w': case 'k': case 't': return true;
+            case 'p': case 'b': case 'w': case 'k': case 't': return true;
             default: return false;
         }
     }
@@ -307,10 +307,12 @@ public final class Server {
             }
             // The pointer verbs are short because they are the only ones sent at the rate a finger
             // moves. Everything else on this stream happens once per human decision.
-            case "m": {
+            // Absolute, not relative. One end keeps the position and the other obeys it, so the
+            // arrow on screen and the pointer the framework believes in cannot drift apart.
+            case "p": {
                 if (pointer == null) return;
                 String[] parts = argument.split(" ");
-                pointer.move(Float.parseFloat(parts[0]), Float.parseFloat(parts[1]));
+                pointer.moveTo(Float.parseFloat(parts[0]), Float.parseFloat(parts[1]));
                 break;
             }
             case "b": {

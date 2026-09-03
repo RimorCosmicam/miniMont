@@ -1592,8 +1592,10 @@ private fun NoteCard(note: Note) {
                 MontLabel(
                     "X",
                     Modifier
-                        .combinedClickable { Notifications.dismiss(note.key) }
-                        .padding(start = 8.dp * scale),
+                        // Padded before it is clickable, so the padding is part of the target
+                        // rather than a margin around one. A letter is a small thing to hit.
+                        .padding(horizontal = 8.dp * scale, vertical = 4.dp * scale)
+                        .combinedClickable { Notifications.dismiss(note.key) },
                     size = NOTE_TITLE,
                     alpha = MontWhite.ACTIVE
                 )
