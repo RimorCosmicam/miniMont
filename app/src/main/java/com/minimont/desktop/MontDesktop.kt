@@ -641,7 +641,21 @@ private fun WidgetPicker(onClose: () -> Unit) {
 
         if (providers.isEmpty()) MontDetail("Nothing installed offers one.")
 
-        providers.chunked(3).forEach { row ->
+        // Grouped by the application that provides them, because that is how anybody looks: you
+        // want the clock's widget, not a widget called Clock 4x1 among forty other names.
+        providers.groupBy { it.packageName }.forEach { (packageName, group) ->
+            Row(
+                Modifier.fillMaxWidth().padding(top = 10.dp * scale, bottom = 4.dp * scale),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AppCatalog.byPackage(context, packageName)?.icon?.let { icon ->
+                    Image(icon, contentDescription = null, modifier = Modifier.size(16.dp * scale))
+                    Spacer(Modifier.width(7.dp * scale))
+                }
+                MontLabel(group.first().app.uppercase(), size = 11, alpha = MontWhite.DETAIL)
+            }
+
+        group.chunked(3).forEach { row ->
             Row(Modifier.fillMaxWidth().padding(vertical = 6.dp * scale)) {
                 row.forEach { provider ->
                     Column(
@@ -669,11 +683,11 @@ private fun WidgetPicker(onClose: () -> Unit) {
                         }
                         Spacer(Modifier.height(4.dp * scale))
                         MontLabel(provider.label, size = 11, alpha = MontWhite.PRIMARY)
-                        MontLabel(provider.app, size = 10, alpha = MontWhite.DETAIL)
                     }
                 }
                 repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
             }
+        }
         }
 
         Spacer(Modifier.height(10.dp * scale))

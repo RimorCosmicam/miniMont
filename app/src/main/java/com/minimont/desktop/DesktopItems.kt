@@ -285,6 +285,7 @@ object Widgets {
                         .getApplicationInfo(info.provider.packageName, 0)
                     context.packageManager.getApplicationLabel(application).toString()
                 }.getOrDefault(info.provider.packageName),
+                packageName = info.provider.packageName,
                 provider = info.provider,
                 width = (info.minWidth / density).toInt().coerceIn(80, 480),
                 height = (info.minHeight / density).toInt().coerceIn(60, 480),
@@ -333,6 +334,7 @@ data class AppWidgetProviderEntry(
     val label: String,
     /** Which application it came from, since a provider's own label rarely says. */
     val app: String,
+    val packageName: String,
     val provider: ComponentName,
     val width: Int,
     val height: Int,

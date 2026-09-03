@@ -174,7 +174,17 @@ class DesktopController private constructor(private val context: Context) {
      * told the socket is open, they want the screen — so a failure anywhere in here reports the
      * step that failed rather than the step they asked for.
      */
-    fun start(width: Int = 1920, height: Int = 1080, density: Int = 160) {
+    /**
+     * @param density why the desktop stopped looking like a magnifying glass held the wrong way.
+     *
+     * 160 means one dp is one pixel, so everything the *system* draws — widgets, dialogs, an app's
+     * own text — comes out at half the size of anything miniMont draws, because miniMont multiplies
+     * its own figures by the Mont scale and nobody else can. 240 is a real density bucket, so apps
+     * pick their hdpi resources rather than being stretched, and the Mont scale falls to about one
+     * on its own: the display is 1067 by 600 dp instead of 1600 by 900, and the scale is worked out
+     * from that. One lever, and both halves of the screen agree afterwards.
+     */
+    fun start(width: Int = 1920, height: Int = 1080, density: Int = 240) {
         scope.launch {
             stop()
             val port = _state.value.connectPort
