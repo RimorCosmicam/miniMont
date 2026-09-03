@@ -113,7 +113,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun Root(controller: DesktopController) {
         var accessibility by remember { mutableStateOf(MontAccessibilityService.granted(this)) }
-        var paired by remember { mutableStateOf(controller.paired) }
+        val paired by controller.pairing.collectAsState()
         var welcomed by remember { mutableStateOf(welcomeSeen) }
 
         // Both of these are switched on in Settings, which means the user is always in another app
@@ -123,7 +123,6 @@ class MainActivity : ComponentActivity() {
             val observer = LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
                     accessibility = MontAccessibilityService.granted(this@MainActivity)
-                    paired = controller.paired
                 }
             }
             owner.lifecycle.addObserver(observer)
@@ -154,7 +153,9 @@ class MainActivity : ComponentActivity() {
                     Requirement(
                         label = "Wireless debugging",
                         detail = "Only the shell user may create a display that will hold a window. " +
-                            "Pairing once is how miniMont becomes it, on this phone alone.",
+                            "Pairing once is how miniMont becomes it, on this phone alone. " +
+                            "Android switches wireless debugging off again every restart, so this " +
+                            "is the step that comes back.",
                         granted = paired,
                         action = "Pair"
                     )

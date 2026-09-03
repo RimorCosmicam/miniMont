@@ -147,10 +147,28 @@ class DesktopController private constructor(private val context: Context) {
         }
     }
 
-    /** True once adbd has our key, so a later start needs no code. */
-    val paired: Boolean
-        get() = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+    private val _paired = MutableStateFlow(
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
             .getBoolean(KEY_PAIRED, false)
+    )
+
+    /**
+     * Whether adbd is believed to have our key — watched, not sampled.
+     *
+     * Wireless debugging comes back off after a restart, and a remembered pairing then describes a
+     * phone that no longer exists. Onboarding asks this, so it has to be able to change its mind
+     * while somebody is looking at it rather than only when the screen is next resumed.
+     */
+    val pairing = _paired.asStateFlow()
+
+    /** True once adbd has our key, so a later start needs no code. */
+    val paired: Boolean get() = _paired.value
+
+    private fun keepPairing(paired: Boolean) {
+        _paired.value = paired
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+            .edit().putBoolean(KEY_PAIRED, paired).apply()
+    }
 
     /**
      * @param onPaired run the moment the code is accepted, before the desktop is started.
@@ -166,8 +184,7 @@ class DesktopController private constructor(private val context: Context) {
             val host = mdns.host.value
             client.pairWith(host, port, code)
                 .onSuccess {
-                    context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-                        .edit().putBoolean(KEY_PAIRED, true).apply()
+                    keepPairing(true)
                     mdns.forgetPairingPort()
                     note("paired with $host:$port")
                     onPaired()
@@ -204,10 +221,6 @@ class DesktopController private constructor(private val context: Context) {
         scope.launch {
             stop()
             val port = _state.value.connectPort
-            if (port == null) {
-                fail("Wireless debugging is not switched on, so there is nothing to connect to.")
-                return@launch
-            }
             _cursor.value = 0f to 0f
             _state.update { it.copy(stage = DesktopStage.CONNECTING, message = "Connecting…") }
             val host = mdns.host.value
@@ -216,24 +229,31 @@ class DesktopController private constructor(private val context: Context) {
             // pairing authorised; 5555 is there whenever somebody has turned on adb over TCP, and
             // it accepts the same key. Trying the second costs one refused socket and saves a
             // six-digit code that was never needed.
+            //
+            // Nothing announced is not nothing listening: adb over TCP does not advertise itself,
+            // so refusing to try 5555 because mDNS was quiet meant a button that did nothing on a
+            // phone with a door standing open.
             var failure: Throwable? = null
-            val connected = listOf(port, LEGACY_PORT).distinct().any { candidate ->
+            val connected = listOfNotNull(port, LEGACY_PORT).distinct().any { candidate ->
                 client.connectTo(host, candidate)
                     .onFailure { failure = it }
                     .isSuccess
             }
             if (!connected) {
+                // Whatever was remembered, it is not true now: nothing answered on either port.
+                // Saying so puts the requirement back on the onboarding screen, which is the only
+                // place that explains how to switch it on again.
+                keepPairing(false)
                 fail(
-                    "Wireless debugging would not accept the connection. Switch it on in " +
-                        "Developer options and try again.",
+                    "Wireless debugging is off — it goes off by itself after a restart. " +
+                        "Switch it back on in Developer options and pair again.",
                     failure
                 )
                 return@launch
             }
             // adbd is the authority on whether it has our key, not a preference we wrote down. A
             // connection that succeeds *is* the pairing, however it was arrived at.
-            context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-                .edit().putBoolean(KEY_PAIRED, true).apply()
+            keepPairing(true)
             _state.update { it.copy(stage = DesktopStage.CONNECTED, message = "Connected") }
             launchHost(width, height, density)
         }
