@@ -429,19 +429,7 @@ private fun DesktopCard(
     MontCard(
         Modifier
             .width(width.dp * scale)
-            .heightIn(max = maxHeight.dp * scale)
-            // The card swallows every press that lands on it, including the ones on its own empty
-            // margins, so that pressing inside a card is never mistaken for pressing beside one.
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Initial)
-                        if (event.type == PointerEventType.Press) {
-                            event.changes.forEach { it.consume() }
-                        }
-                    }
-                }
-            },
+            .heightIn(max = maxHeight.dp * scale),
         content = content
     )
 }

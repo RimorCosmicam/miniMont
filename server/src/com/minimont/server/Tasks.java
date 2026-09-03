@@ -104,6 +104,22 @@ public final class Tasks {
         return new ArrayList<>(names);
     }
 
+    /** Send a task to the bottom of its display, which is how everything else gets revealed. */
+    public static boolean toBack(int taskId) {
+        for (String name : new String[] { "moveRootTaskToBack", "moveTaskToBack" }) {
+            try {
+                Object service = service();
+                Method method = Class.forName("android.app.IActivityTaskManager")
+                        .getMethod(name, int.class);
+                method.invoke(service, taskId);
+                return true;
+            } catch (Throwable notThisOne) {
+                // The name has not been the same across releases; try the next.
+            }
+        }
+        return run("am stack move-task " + taskId + " " + taskId + " false");
+    }
+
     public static boolean resize(int taskId, int left, int top, int right, int bottom) {
         try {
             Object service = service();

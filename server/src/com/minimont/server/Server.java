@@ -270,6 +270,7 @@ public final class Server {
         switch (verb) {
             case "launch": {
                 if (display == null || argument.isEmpty()) return;
+                if (desks != null) desks.unpeek();
                 // Already open on another desktop? Go there rather than dragging it here. A
                 // desktop that gives up its windows the moment you ask for one somewhere else is
                 // not holding an arrangement, it is holding a list.
@@ -306,7 +307,7 @@ public final class Server {
                 switch (parts[0]) {
                     case "add": desks.add(); break;
                     case "remove": desks.remove(Integer.parseInt(parts[1])); break;
-                    case "show": desks.switchTo(Integer.parseInt(parts[1])); break;
+                    case "show": desks.unpeek(); desks.switchTo(Integer.parseInt(parts[1])); break;
                     default: break;
                 }
                 announce(true);
@@ -352,7 +353,8 @@ public final class Server {
                 break;
             }
             case "backdrop": {
-                if (display != null && !backdrop.isEmpty()) Desktop.showDesktop(display.id(), backdrop);
+                if (desks != null) desks.togglePeek();
+                announce(true);
                 break;
             }
             case "running": {

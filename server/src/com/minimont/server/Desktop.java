@@ -62,7 +62,24 @@ public final class Desktop {
      * where a backdrop lives. Reordering its task to the front is what actually shows the desktop.
      */
     public static boolean showDesktop(int displayId, String component) {
-        return start(displayId, component, FULLSCREEN, false, NEW_TASK | REORDER_TO_FRONT);
+        // Everything else goes to the back, rather than the backdrop being asked to come forward.
+        //
+        // Asking it forward does not work: it is already running, so the intent is handed to the
+        // instance that exists, and a reorder flag on an activity that is already at the top of its
+        // own task changes nothing — the task is still under all the others. Sending the others
+        // down is the same result by the only route that has one.
+        // Moved to the display it is already on, which is the one reparent this device honours.
+        //
+        // Sending the others to the back reported success and moved nothing — neither framework
+        // name exists here and the shell command exits zero while doing nothing. Asking the
+        // backdrop forward does nothing either, because it is already the top activity of its own
+        // task. But moveRootTaskToDisplay works, and a task moved onto a display arrives at the top
+        // of it — including when it is the display it was already on.
+        int[] found = Tasks.find("com.minimont");
+        if (found == null) return false;
+        boolean raised = Tasks.moveToDisplay(found[0], displayId);
+        Ln.i("DESKTOP", raised ? "showing the desktop" : "could not raise the backdrop");
+        return raised;
     }
 
     public static boolean backdrop(int displayId, String component) {

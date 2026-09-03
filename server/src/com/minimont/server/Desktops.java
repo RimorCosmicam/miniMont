@@ -123,6 +123,60 @@ public final class Desktops {
         return -1;
     }
 
+    /**
+     * Show the desktop, and show it again to put everything back.
+     *
+     * Nothing else worked. The backdrop cannot be asked forward — it is already the top activity of
+     * its own task, so a reorder changes nothing — and the windows above it cannot be sent down,
+     * because neither framework name for that exists on this device and the shell command exits
+     * zero having done nothing. `moveRootTaskToDisplay` refuses a move to the display a task is
+     * already on.
+     *
+     * But moving tasks between displays is the one thing that does work, and it is already how a
+     * desktop switch hides windows. So this is a switch to nowhere: everything on screen goes to a
+     * display of its own and comes back on the second press, in the order and shape it left in.
+     */
+    public boolean togglePeek() {
+        if (visibleDisplayId < 0) return false;
+        if (peeking) {
+            if (peek != null) {
+                for (int[] task : Tasks.tasksOn(peek.id(), ours)) {
+                    Tasks.moveToDisplay(task[0], visibleDisplayId);
+                }
+            }
+            peeking = false;
+            Ln.i("DESKS", "windows back");
+            return true;
+        }
+        int store = peekStore();
+        if (store < 0) return false;
+        for (int[] task : Tasks.tasksOn(visibleDisplayId, ours)) {
+            Tasks.moveToDisplay(task[0], store);
+        }
+        peeking = true;
+        Ln.i("DESKS", "showing the desktop");
+        return true;
+    }
+
+    /** Put the windows back if they are away, for anything that needs the desktop as it was. */
+    public void unpeek() {
+        if (peeking) togglePeek();
+    }
+
+    private MontDisplay peek;
+    private boolean peeking;
+
+    private int peekStore() {
+        if (peek != null) return peek.id();
+        try {
+            peek = MontDisplay.parked("miniMont peek", width, height, dpi);
+            return peek.id();
+        } catch (Throwable failure) {
+            Ln.e("DESKS", "could not make somewhere to put the windows", failure);
+            return -1;
+        }
+    }
+
     /** What is on each desktop, as `pkg,pkg|pkg||pkg` — one field per desktop, in order. */
     public String describe() {
         StringBuilder out = new StringBuilder();
@@ -143,6 +197,11 @@ public final class Desktops {
     }
 
     public void release() {
+        if (peek != null) {
+            peek.release();
+            peek = null;
+        }
+        peeking = false;
         for (MontDisplay display : storage) {
             if (display != null) display.release();
         }
