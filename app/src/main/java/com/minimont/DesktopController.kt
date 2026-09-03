@@ -583,7 +583,40 @@ class DesktopController private constructor(private val context: Context) {
         sweep()
     }
 
+    /**
+     * Two words to a host on this phone, over loopback.
+     *
+     * The near door: no adb, no pairing, and it still answers when wireless debugging has switched
+     * itself off — which it does every restart, and which used to leave a running host with no way
+     * to be stopped at all.
+     */
+    private suspend fun knock(word: String): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            java.net.Socket().use { socket ->
+                socket.connect(
+                    java.net.InetSocketAddress("127.0.0.1", com.minimont.server.Server.DOOR_PORT),
+                    500
+                )
+                socket.soTimeout = 1000
+                socket.getOutputStream().apply {
+                    write("$word\n".toByteArray())
+                    flush()
+                }
+                socket.getInputStream().bufferedReader().readLine()
+            }
+        }.getOrNull()
+    }
+
+    /** Whether a host is up right now, whoever started it and whenever that was. */
+    suspend fun hostStanding(): Boolean = knock("alive") == "yes"
+
     private suspend fun sweep() {
+        // The near door first. It needs nothing to be switched on, so it is the one that works in
+        // the case that matters: a host still holding the display after a restart.
+        if (knock("quit") != null) {
+            note("host asked to leave over the local door")
+            return
+        }
         if (!client.connected) {
             val host = mdns.host.value
             listOfNotNull(_state.value.connectPort, LEGACY_PORT).distinct()

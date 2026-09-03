@@ -77,6 +77,21 @@ The last two are new. AirMate's protocol carries video and a thin control channe
 because AirMate's host has nothing to say about what is on the screen — DeX owns
 that. miniMont's host has to describe the desktop to the thing drawing it.
 
+### The near door
+
+The control channel is an adb shell, which exists only while wireless debugging is
+on — and Android switches wireless debugging off at every restart. A host that is
+still holding a display when that happens cannot be reached by the app at all, and
+a virtual display nobody can reach is one that outlives every attempt to close it.
+
+So the host also listens on `127.0.0.1:47821` and answers two words: `alive` with
+`yes`, and `quit` by releasing the display and exiting. Same phone, loopback only,
+no pairing and no permission. Stopping tries this first and falls back to adb.
+
+Pinned to the v4 loopback deliberately: `InetAddress.getLoopbackAddress()` answers
+`::1` on this device, and a door bound there refuses every knock on `127.0.0.1`
+while the log cheerfully reports it open.
+
 ## Why the desktop is not in the shell process
 
 It could be. scrcpy-style servers can draw. Two reasons it is not:

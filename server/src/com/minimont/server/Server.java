@@ -29,6 +29,9 @@ public final class Server {
     /** Our own backdrop holds a task on this display and is not an application anybody opened. */
     private static final String OURS = "com.minimont";
 
+    /** Where a host listens for "quit", on this phone and no other. */
+    public static final int DOOR_PORT = 47821;
+
     private final int dpi;
     private final boolean freeform;
     private final boolean preferHevc;
@@ -192,6 +195,7 @@ public final class Server {
 
         Runtime.getRuntime().addShutdownHook(new Thread(this::stopSession));
         watchLauncher();
+        openDoor();
 
         session.execute(this::startSession);
 
@@ -245,6 +249,57 @@ public final class Server {
         }, "miniMont-Watchdog");
         watchdog.setDaemon(true);
         watchdog.start();
+    }
+
+    /**
+     * A door on the loopback that anything on this phone can knock on.
+     *
+     * The control stream is an adb shell, which means the one way to reach this process was a
+     * channel that only exists while wireless debugging is on — and wireless debugging switches
+     * itself off every restart. A host still holding a display when that happens could not be
+     * stopped by the app, by the user, or by anything short of rebooting the phone.
+     *
+     * This needs no adb, no permission and no pairing: same device, loopback only, two words.
+     */
+    private void openDoor() {
+        Thread door = new Thread(() -> {
+            try (java.net.ServerSocket gate = new java.net.ServerSocket()) {
+                gate.setReuseAddress(true);
+                // Pinned to the v4 loopback rather than whichever one the runtime prefers:
+                // getLoopbackAddress() answered ::1 here, and a knock on 127.0.0.1 was refused by
+                // a door that the log insisted was open.
+                gate.bind(new java.net.InetSocketAddress(
+                        java.net.InetAddress.getByName("127.0.0.1"), DOOR_PORT));
+                Ln.i("HOST", "local door open on " + DOOR_PORT);
+                while (true) {
+                    try (java.net.Socket caller = gate.accept()) {
+                        caller.setSoTimeout(2000);
+                        java.io.BufferedReader in = new java.io.BufferedReader(
+                                new java.io.InputStreamReader(caller.getInputStream()));
+                        String asked = in.readLine();
+                        if (asked == null) continue;
+                        asked = asked.trim();
+                        java.io.OutputStream out = caller.getOutputStream();
+                        if ("quit".equals(asked)) {
+                            out.write("bye\n".getBytes());
+                            out.flush();
+                            Ln.i("HOST", "asked to leave; releasing the display and exiting");
+                            stopSession();
+                            System.exit(0);
+                        } else if ("alive".equals(asked)) {
+                            out.write("yes\n".getBytes());
+                            out.flush();
+                        }
+                    } catch (Exception ignored) {
+                        // One bad caller is not a reason to close the only way out.
+                    }
+                }
+            } catch (Exception failure) {
+                Ln.e("HOST", "no local door; stopping this host will need adb", failure);
+            }
+        }, "miniMont-Door");
+        door.setDaemon(true);
+        door.start();
     }
 
     /** Whether a line is one of the verbs sent at the rate a finger moves. */
