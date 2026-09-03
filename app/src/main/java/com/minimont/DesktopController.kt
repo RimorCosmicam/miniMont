@@ -219,7 +219,7 @@ class DesktopController private constructor(private val context: Context) {
         density: Int = com.minimont.desktop.DesktopStore.state.value.density
     ) {
         scope.launch {
-            stop()
+            halt()
             val port = _state.value.connectPort
             _cursor.value = 0f to 0f
             _state.update { it.copy(stage = DesktopStage.CONNECTING, message = "Connecting…") }
@@ -553,6 +553,22 @@ class DesktopController private constructor(private val context: Context) {
      * process nobody can see, and a handful of those stop any new session from starting at all.
      */
     fun stop() {
+        scope.launch { halt() }
+    }
+
+    /**
+     * Stop the desktop, and mean the whole of it.
+     *
+     * The host is not part of this app: it runs as the shell user, started over adb, and it holds
+     * the display, the encoder and the socket the tablet is watching. Closing our end of the shell
+     * asks it to leave, and a fresh app process has no end to close — so quitting the app and
+     * reopening it to press Stop was a button with nothing behind it while the picture carried on.
+     *
+     * So the last word is a kill, sent over a shell of its own. It also clears out any host left
+     * over from an earlier run of this app, which is why [start] waits for it before opening a new
+     * one rather than racing it.
+     */
+    private suspend fun halt() {
         runCatching { stream?.close() }
         stream = null
         _state.update {
@@ -564,6 +580,20 @@ class DesktopController private constructor(private val context: Context) {
                 openApps = emptyList()
             )
         }
+        sweep()
+    }
+
+    private suspend fun sweep() {
+        if (!client.connected) {
+            val host = mdns.host.value
+            listOfNotNull(_state.value.connectPort, LEGACY_PORT).distinct()
+                .any { client.connectTo(host, it).isSuccess }
+        }
+        if (!client.connected) return
+        // The brackets are why this does not kill the shell running it: pkill matches its own
+        // command line too, and a regex that reads as itself would be the last thing it matched.
+        runCatching { client.shell("pkill -f 'com[.]minimont[.]server[.]Server'") }
+            .onFailure { Log.w(TAG, "could not clear a leftover host", it) }
     }
 
     fun release() {
