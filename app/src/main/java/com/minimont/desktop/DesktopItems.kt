@@ -220,10 +220,13 @@ private fun Shortcut(item: DesktopStore.Item, onOpen: () -> Unit, onHold: () -> 
 @Composable
 private fun Widget(item: DesktopStore.Item, host: AppWidgetHost?, onHold: () -> Unit) {
     val context = LocalContext.current
+    val density = LocalDensity.current
+    var width by remember(item.id) { mutableStateOf(item.width.toFloat()) }
+    var height by remember(item.id) { mutableStateOf(item.height.toFloat()) }
 
     Box(
         Modifier
-            .size(item.width.dp, item.height.dp)
+            .size(width.dp, height.dp)
             .combinedClickable(onClick = {}, onLongClick = onHold)
     ) {
         if (host == null || item.widgetId == 0) {
@@ -232,6 +235,29 @@ private fun Widget(item: DesktopStore.Item, host: AppWidgetHost?, onHold: () -> 
             }
             return@Box
         }
+        // The corner, for the ones whose provider guessed wrong about how much room they wanted.
+        // A widget is the only thing on this desktop whose right size nobody else can know.
+        Box(
+            Modifier
+                .align(Alignment.BottomEnd)
+                .size(16.dp)
+                .background(Color.White.copy(alpha = MontWhite.BORDER))
+                .pointerInput(item.id) {
+                    detectDragGestures(
+                        onDrag = { change, dragged ->
+                            change.consume()
+                            width = (width + with(density) { dragged.x.toDp().value })
+                                .coerceIn(72f, 720f)
+                            height = (height + with(density) { dragged.y.toDp().value })
+                                .coerceIn(72f, 720f)
+                        },
+                        onDragEnd = {
+                            DesktopStore.resizeItem(item.id, width.toInt(), height.toInt())
+                        }
+                    )
+                }
+        )
+
         AndroidView(
             factory = { viewContext ->
                 val manager = AppWidgetManager.getInstance(viewContext)
@@ -254,11 +280,13 @@ private fun Widget(item: DesktopStore.Item, host: AppWidgetHost?, onHold: () -> 
                 if (android.os.Build.VERSION.SDK_INT >= 31) {
                     view.updateAppWidgetSize(
                         android.os.Bundle.EMPTY,
-                        listOf(android.util.SizeF(item.width.toFloat(), item.height.toFloat()))
+                        listOf(android.util.SizeF(width, height))
                     )
                 } else {
                     @Suppress("DEPRECATION")
-                    view.updateAppWidgetSize(null, item.width, item.height, item.width, item.height)
+                    view.updateAppWidgetSize(
+                        null, width.toInt(), height.toInt(), width.toInt(), height.toInt()
+                    )
                 }
             }
         )
@@ -287,8 +315,8 @@ object Widgets {
                 }.getOrDefault(info.provider.packageName),
                 packageName = info.provider.packageName,
                 provider = info.provider,
-                width = (info.minWidth / density).toInt().coerceIn(80, 480),
-                height = (info.minHeight / density).toInt().coerceIn(60, 480),
+                width = size(info, density, horizontal = true),
+                height = size(info, density, horizontal = false),
                 // What the provider drew of itself. Falling back to its icon rather than to
                 // nothing: a picker of blank rectangles is a list with worse spacing.
                 preview = runCatching {
@@ -297,6 +325,38 @@ object Widgets {
             )
         }.sortedBy { it.label.lowercase() }
     }.getOrDefault(emptyList())
+
+    /**
+     * How big to make a widget before anybody has dragged it.
+     *
+     * `minWidth` is what it says: the smallest the provider will tolerate, not the size it was
+     * drawn for. Give a widget exactly its minimum and it lays its contents out in sequence until
+     * it runs out of room and clips the rest — which is what a launcher never does, because a
+     * launcher hands it whole cells.
+     *
+     * So the cell count is used where the provider gives one, at the size a cell actually is, and
+     * the minimum is only a floor under that.
+     */
+    private fun size(
+        info: android.appwidget.AppWidgetProviderInfo,
+        density: Float,
+        horizontal: Boolean
+    ): Int {
+        val minimum = ((if (horizontal) info.minWidth else info.minHeight) / density).toInt()
+        val cells = if (android.os.Build.VERSION.SDK_INT >= 31) {
+            if (horizontal) info.targetCellWidth else info.targetCellHeight
+        } else {
+            0
+        }
+        // A launcher cell is about seventy dp across once its gaps are counted. Two of them is the
+        // smallest thing worth putting on a desktop.
+        val fromCells = cells * CELL
+        return maxOf(minimum, fromCells, if (horizontal) CELL * 2 else CELL)
+            .coerceAtMost(560)
+    }
+
+    /** One launcher cell, near enough, in dp. */
+    private const val CELL = 72
 
     private fun android.graphics.drawable.Drawable.toBitmap(): ImageBitmap {
         if (this is android.graphics.drawable.BitmapDrawable && bitmap != null) {
