@@ -903,7 +903,15 @@ private fun Taskbar(
             horizontalArrangement = Arrangement.spacedBy(9.dp * scale),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            StartSquares(Modifier.size(thickness.icon.dp * scale), onStart)
+            // Built the same way a taskbar item is, dot and all — the dot simply never drawn.
+            //
+            // The mustard grid was a bare icon standing beside columns of icon-gap-dot, so the row
+            // centred two different shapes against each other and every application sat higher
+            // than the thing that opens them. Same column, same reserved space underneath, and
+            // they line up because they are the same object.
+            TaskbarItem(thickness, running = false) {
+                StartSquares(Modifier.fillMaxSize(), onStart)
+            }
             apps.forEach { app ->
                 DockItem(app, thickness, app.packageName in running, { onOpen(app) }, { onHold(app) })
             }
@@ -1045,6 +1053,32 @@ private fun StartSquares(modifier: Modifier = Modifier, onClick: () -> Unit) {
  * The open ones get a small mustard square below the icon instead, clear of it rather than sitting
  * on its bottom edge. An addition to what is running, rather than a subtraction from what is not.
  */
+/**
+ * One thing standing in the taskbar: an icon, and the room a dot takes underneath it.
+ *
+ * The room is reserved whether the dot is drawn or not, so everything in the bar is the same shape
+ * and lines up on the same centre.
+ */
+@Composable
+private fun TaskbarItem(
+    thickness: DesktopStore.Thickness,
+    running: Boolean,
+    modifier: Modifier = Modifier,
+    icon: @Composable () -> Unit
+) {
+    val scale = LocalMontScale.current
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(Modifier.size(thickness.icon.dp * scale), contentAlignment = Alignment.Center) {
+            icon()
+        }
+        Spacer(Modifier.height(3.dp * scale))
+        // Drawn or not drawn. Nothing announces itself, so there is no faint dot for a closed app.
+        Canvas(Modifier.size(width = 5.dp * scale, height = 3.dp * scale)) {
+            if (running) drawRect(MontAccent.Mustard, size = size)
+        }
+    }
+}
+
 @Composable
 private fun DockItem(
     app: DesktopApp,
@@ -1053,25 +1087,18 @@ private fun DockItem(
     onClick: () -> Unit,
     onHold: () -> Unit
 ) {
-    val scale = LocalMontScale.current
-    Column(
-        Modifier
+    TaskbarItem(
+        thickness = thickness,
+        running = running,
+        modifier = Modifier
             .secondary { onHold() }
-            .combinedClickable(onClick = onClick, onLongClick = onHold),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .combinedClickable(onClick = onClick, onLongClick = onHold)
     ) {
-        Box(Modifier.size(thickness.icon.dp * scale), contentAlignment = Alignment.Center) {
-            val icon = app.icon
-            if (icon != null) {
-                Image(icon, contentDescription = app.label, modifier = Modifier.fillMaxSize())
-            } else {
-                MontLabel(app.label.take(1).uppercase(), size = 20, alpha = MontWhite.ACTIVE)
-            }
-        }
-        Spacer(Modifier.height(3.dp * scale))
-        // Drawn or not drawn. Nothing announces itself, so there is no faint dot for a closed app.
-        Canvas(Modifier.size(width = 5.dp * scale, height = 3.dp * scale)) {
-            if (running) drawRect(MontAccent.Mustard, size = size)
+        val icon = app.icon
+        if (icon != null) {
+            Image(icon, contentDescription = app.label, modifier = Modifier.fillMaxSize())
+        } else {
+            MontLabel(app.label.take(1).uppercase(), size = 20, alpha = MontWhite.ACTIVE)
         }
     }
 }
