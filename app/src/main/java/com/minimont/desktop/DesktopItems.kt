@@ -33,6 +33,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
@@ -117,7 +118,8 @@ fun DesktopItems(
             .fillMaxSize()
             // The desktop itself answers a right click. A long press on the wallpaper does the
             // same, for the tablet, which has fingers and no second button.
-            .secondary { at -> deskMenu = at }
+            // Last, so anything standing on the desktop answers first.
+            .secondary(PointerEventPass.Final) { at -> deskMenu = at }
             // Taps handled without `clickable`, which draws an indication — a ripple across the
             // whole wallpaper every time anybody put the pointer down on it. The desktop has
             // nothing to say about being touched; it only needs to know a tap happened so it can

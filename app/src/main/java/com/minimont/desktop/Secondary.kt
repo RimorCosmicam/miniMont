@@ -20,11 +20,24 @@ import kotlinx.coroutines.flow.asStateFlow
  *
  * @param onClick given the position of the press, for menus that open where the pointer is.
  */
-fun Modifier.secondary(onClick: (Offset) -> Unit): Modifier = this.pointerInput(onClick) {
+fun Modifier.secondary(
+    /**
+     * Which pass to take the press on, and it decides who wins.
+     *
+     * Initial is delivered parent first. A desktop and a widget standing on it both watching for a
+     * right click therefore both saw the same press, and both opened a menu — one behind the other.
+     * Whoever is *underneath* has to listen later: the widget takes it on Initial and consumes it,
+     * the desktop takes it on Final and finds it already spoken for.
+     */
+    pass: PointerEventPass = PointerEventPass.Initial,
+    onClick: (Offset) -> Unit
+): Modifier = this.pointerInput(onClick, pass) {
     awaitPointerEventScope {
         while (true) {
-            val event = awaitPointerEvent(PointerEventPass.Initial)
+            val event = awaitPointerEvent(pass)
             if (event.type != PointerEventType.Press || !event.buttons.isSecondaryPressed) continue
+            // Somebody nearer the finger has already answered this one.
+            if (event.changes.any { it.isConsumed }) continue
 
             val at = event.changes.firstOrNull()?.position ?: Offset.Zero
             event.changes.forEach { it.consume() }
@@ -32,7 +45,7 @@ fun Modifier.secondary(onClick: (Offset) -> Unit): Modifier = this.pointerInput(
 
             var pressed = true
             while (pressed) {
-                val rest = awaitPointerEvent(PointerEventPass.Initial)
+                val rest = awaitPointerEvent(pass)
                 rest.changes.forEach { it.consume() }
                 pressed = rest.changes.any { it.pressed }
             }
