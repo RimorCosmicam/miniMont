@@ -79,7 +79,7 @@ public final class Desktop {
      */
     public static boolean open(int displayId, String action, String data) {
         String command = "am start -a " + action
-                + (data == null || data.isEmpty() ? "" : " -d " + data)
+                + (data == null || data.isEmpty() ? "" : " -d '" + data + "'")
                 + " --display " + displayId
                 + " --windowingMode " + FREEFORM
                 + " -f 0x" + Integer.toHexString(NEW_TASK);
@@ -248,7 +248,12 @@ public final class Desktop {
         StringBuilder command = new StringBuilder("am start")
                 .append(" --display ").append(displayId)
                 .append(" --windowingMode ").append(windowingMode)
-                .append(" -n ").append(component);
+                // Quoted, because these commands go through `sh -c` and a component name is full
+                // of things a shell has opinions about. YouTube's launcher activity is
+                // `.app.honeycomb.Shell$HomeActivity`; unquoted, the shell expanded $HomeActivity
+                // to nothing and started `...Shell`, which does not exist. It failed silently for
+                // every app whose launcher is an inner class, which is a great many of them.
+                .append(" -n '").append(component).append("'");
         if (flags != 0) command.append(" -f 0x").append(Integer.toHexString(flags));
         // The backdrop is started once and then re-shown rather than restarted, so that turning the
         // wallpaper card on and off does not throw away the window every time.
