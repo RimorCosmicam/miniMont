@@ -12,7 +12,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -35,6 +34,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
@@ -119,17 +120,36 @@ fun DesktopItems(
             .fillMaxSize()
             // The desktop itself answers a right click. A long press on the wallpaper does the
             // same, for the tablet, which has fingers and no second button.
-            // Last, so anything standing on the desktop answers first.
-            .secondary(PointerEventPass.Final) { at -> deskMenu = at }
-            // Taps handled without `clickable`, which draws an indication — a ripple across the
-            // whole wallpaper every time anybody put the pointer down on it. The desktop has
-            // nothing to say about being touched; it only needs to know a tap happened so it can
-            // put its menu away.
+            // One handler doing both jobs.
+            //
+            // Two of them fought: a secondary watcher and a tap detector, on the same node. The tap
+            // detector consumed the press first and the right click never arrived. They are the
+            // same question anyway — what kind of press was that — so it is asked once.
+            //
+            // Taken on Main, which is delivered child first, so a widget standing on the desktop
+            // has already answered and consumed before this is reached. And no `clickable`
+            // anywhere: clickable draws an indication, which was a ripple across the whole
+            // wallpaper every time the pointer went down.
             .pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = { deskMenu = null },
-                    onLongPress = { at -> deskMenu = at }
-                )
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Main)
+                        if (event.type != PointerEventType.Press) continue
+                        if (event.changes.any { it.isConsumed }) continue
+
+                        val at = event.changes.firstOrNull()?.position ?: Offset.Zero
+                        if (event.buttons.isSecondaryPressed) {
+                            event.changes.forEach { it.consume() }
+                            deskMenu = at
+                        } else {
+                            // A press on bare wallpaper puts away whatever was open — the
+                            // desktop's own menu, and any card the chrome has up. Clicking
+                            // somewhere else is how anybody dismisses a menu.
+                            deskMenu = null
+                            DesktopRequests.dismiss()
+                        }
+                    }
+                }
             }
     ) {
         // Keyed by identity, not by position in the list.

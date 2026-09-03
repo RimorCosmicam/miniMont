@@ -141,6 +141,7 @@ fun MontDesktop(
                 panel = Panel.SETTINGS
             }
             DesktopRequests.Panel.SETTINGS -> panel = Panel.SETTINGS
+            DesktopRequests.Panel.NONE -> panel = Panel.NONE
             null -> return@LaunchedEffect
         }
         DesktopRequests.answered()

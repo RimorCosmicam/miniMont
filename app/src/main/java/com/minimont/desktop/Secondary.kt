@@ -62,13 +62,24 @@ fun Modifier.secondary(
  * cards belong.
  */
 object DesktopRequests {
-    enum class Panel { WIDGETS, WALLPAPER, SETTINGS }
+    enum class Panel { WIDGETS, WALLPAPER, SETTINGS, NONE }
 
     private val _asked = MutableStateFlow<Panel?>(null)
     val asked = _asked.asStateFlow()
 
     fun ask(panel: Panel) {
         _asked.value = panel
+    }
+
+    /**
+     * Put away whatever is open.
+     *
+     * Sent when somebody presses bare wallpaper. The cards live in the chrome window, which is only
+     * as big as the card in it — so a click anywhere else lands on the desktop and the chrome never
+     * hears about it. This is how it hears.
+     */
+    fun dismiss() {
+        _asked.value = Panel.NONE
     }
 
     /** Cleared by whoever answered it, so the same request is not answered twice. */
