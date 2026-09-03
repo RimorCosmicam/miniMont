@@ -432,6 +432,9 @@ class DesktopController private constructor(private val context: Context) {
     fun open(action: String, data: String? = null) =
         send("open $action${if (data.isNullOrBlank()) "" else " $data"}")
 
+    /** A second window of an app, on the desktop being looked at. */
+    fun spawn(component: String) = send("spawn $component")
+
     /** Close an app, and mean it: the host force-stops it. */
     fun close(packageName: String) = send("close $packageName")
 

@@ -77,6 +77,22 @@ public final class Desktop {
      * framework refuses to move it, open a second window of it here. Two windows is a worse answer
      * than one in the right place, and a better one than a desktop whose apps open behind you.
      */
+    /**
+     * A second window of something, on the desktop you are looking at.
+     *
+     * Asked for explicitly, because the plain launch deliberately does the opposite: it takes you
+     * to wherever the application already is. This one insists on a new task here.
+     *
+     * An application that will not have two — most will not, their launch mode forbids it — simply
+     * brings its existing window across instead. That is the framework's answer rather than ours,
+     * and it is a reasonable one: you asked to have it here, and here it is.
+     */
+    public static boolean spawn(int displayId, String component) {
+        boolean started = start(displayId, component, FREEFORM, false, NEW_TASK | MULTIPLE_TASK);
+        place(packageOf(component));
+        return started;
+    }
+
     public static boolean open(int displayId, String action, String data) {
         String command = "am start -a " + action
                 + (data == null || data.isEmpty() ? "" : " -d '" + data + "'")

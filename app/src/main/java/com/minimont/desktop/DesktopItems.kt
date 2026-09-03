@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -82,13 +83,13 @@ private object Grid {
     const val TALL = 96
     const val MARGIN = (ICON * 3) / 2
 
-    fun snapX(value: Float, limit: Int): Int = snap(value, WIDE, limit)
+    fun snapX(value: Float, from: Int, limit: Int): Int = snap(value, WIDE, from, limit)
 
-    fun snapY(value: Float, limit: Int): Int = snap(value, TALL, limit)
+    fun snapY(value: Float, from: Int, limit: Int): Int = snap(value, TALL, from, limit)
 
-    private fun snap(value: Float, step: Int, limit: Int): Int {
-        val cells = ((value - MARGIN) / step).roundToInt().coerceAtLeast(0)
-        return (MARGIN + cells * step).coerceIn(MARGIN, maxOf(MARGIN, limit))
+    private fun snap(value: Float, step: Int, from: Int, limit: Int): Int {
+        val cells = ((value - from) / step).roundToInt().coerceAtLeast(0)
+        return (from + cells * step).coerceIn(from, maxOf(from, limit))
     }
 
     /** The first cell nothing is standing in, so two things added in a row do not land on top. */
@@ -125,6 +126,23 @@ fun DesktopItems(
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
     val screen = configuration.screenWidthDp to configuration.screenHeightDp
+
+    // The grid starts inside whatever the taskbar has taken.
+    //
+    // The bar's real thickness is measured in the window that draws it, which is not this one, so
+    // it is worked out from the same figures the bar is built from. A few dp either way costs
+    // alignment against the bar and nothing else — what it must never do is let an icon sit under
+    // it, which is the one thing this is for.
+    val settings by DesktopStore.state.collectAsState()
+    val barScale = (minOf(screen.first, screen.second) / 560f).coerceIn(1f, 1.6f)
+    val barExtent = ((settings.thickness.padding * 2 + settings.thickness.icon + 6) * barScale).toInt()
+    val side = settings.side
+    val fromX = Grid.MARGIN + if (side == DesktopStore.Side.LEFT) barExtent else 0
+    val fromY = Grid.MARGIN + if (side == DesktopStore.Side.TOP) barExtent else 0
+    val toX = screen.first - Grid.MARGIN - Grid.WIDE -
+        if (side == DesktopStore.Side.RIGHT) barExtent else 0
+    val toY = screen.second - Grid.MARGIN - Grid.TALL -
+        if (side == DesktopStore.Side.BOTTOM) barExtent else 0
     // The item whose menu is open, and where the pointer was when it opened. A menu belongs under
     // the cursor: put it under the *element* and it lands somewhere you were not looking, and for a
     // widget five cells wide that is a long way from the hand that asked for it.
@@ -184,16 +202,19 @@ fun DesktopItems(
             Canvas(Modifier.fillMaxSize()) {
                 val wide = Grid.WIDE.dp.toPx()
                 val tall = Grid.TALL.dp.toPx()
-                val margin = Grid.MARGIN.dp.toPx()
+                val left = fromX.dp.toPx()
+                val top = fromY.dp.toPx()
+                val right = (toX + Grid.WIDE).dp.toPx()
+                val bottom = (toY + Grid.TALL).dp.toPx()
                 val line = Color.Black.copy(alpha = .55f)
-                var x = margin
-                while (x <= size.width) {
-                    drawLine(line, Offset(x, margin), Offset(x, size.height - margin), 1f)
+                var x = left
+                while (x <= right) {
+                    drawLine(line, Offset(x, top), Offset(x, bottom), 1f)
                     x += wide
                 }
-                var y = margin
-                while (y <= size.height) {
-                    drawLine(line, Offset(margin, y), Offset(size.width - margin, y), 1f)
+                var y = top
+                while (y <= bottom) {
+                    drawLine(line, Offset(left, y), Offset(right, y), 1f)
                     y += tall
                 }
             }
@@ -227,8 +248,8 @@ fun DesktopItems(
                             // Snapped when the finger lifts rather than while it moves: an icon
                             // that jumps between cells under the pointer is an icon fighting you.
                             onDragEnd = {
-                                dragX = Grid.snapX(dragX, screen.first - Grid.WIDE).toFloat()
-                                dragY = Grid.snapY(dragY, screen.second - Grid.TALL).toFloat()
+                                dragX = Grid.snapX(dragX, fromX, toX).toFloat()
+                                dragY = Grid.snapY(dragY, fromY, toY).toFloat()
                                 DesktopStore.moveItem(item.id, dragX.toInt(), dragY.toInt())
                                 moving = null
                             }

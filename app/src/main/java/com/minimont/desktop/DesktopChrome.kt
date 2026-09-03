@@ -25,6 +25,7 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.minimont.DesktopController
+import com.minimont.desktop.DesktopStore
 import com.minimont.ui.mont.LocalMontScale
 
 /** Android's own back key, sent to the display rather than to the phone. */
@@ -94,6 +95,7 @@ class DesktopChrome(
                         onArea = controller::setArea,
                         onOpenPhone = controller::open,
                         onArrangeWindow = controller::arrange,
+                        onSpawnWindow = controller::spawn,
                         // Back goes back in whatever has focus on this display.
                         onBack = { controller.key(KEYCODE_BACK) },
                         // Home shows the desktop rather than leaving for the phone's launcher.

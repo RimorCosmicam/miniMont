@@ -101,6 +101,28 @@ public final class Desktops {
         Ln.i("DESKS", "showing desktop " + index);
     }
 
+    /**
+     * Which desktop an application is standing on, or -1 if it is not open anywhere.
+     *
+     * Asked before a launch. An application already open on another desktop should take you to it
+     * rather than be dragged here — that is the difference between desktops that hold arrangements
+     * and desktops that are just somewhere windows happen to be.
+     */
+    public int desktopOf(String packageName) {
+        for (int index = 0; index < storage.size(); index++) {
+            int displayId;
+            if (index == current) {
+                displayId = visibleDisplayId;
+            } else {
+                MontDisplay display = storage.get(index);
+                if (display == null) continue;
+                displayId = display.id();
+            }
+            if (Tasks.packagesOn(displayId, ours).contains(packageName)) return index;
+        }
+        return -1;
+    }
+
     /** What is on each desktop, as `pkg,pkg|pkg||pkg` — one field per desktop, in order. */
     public String describe() {
         StringBuilder out = new StringBuilder();

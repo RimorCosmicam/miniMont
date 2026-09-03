@@ -257,10 +257,27 @@ public final class Server {
         switch (verb) {
             case "launch": {
                 if (display == null || argument.isEmpty()) return;
+                // Already open on another desktop? Go there rather than dragging it here. A
+                // desktop that gives up its windows the moment you ask for one somewhere else is
+                // not holding an arrangement, it is holding a list.
+                if (desks != null) {
+                    int where = desks.desktopOf(packageOf(argument));
+                    if (where >= 0 && where != desks.current()) {
+                        desks.switchTo(where);
+                        announce(true);
+                        return;
+                    }
+                }
                 if (Desktop.launch(display.id(), argument)) {
                     launched.add(packageOf(argument));
                     announce(true);
                 }
+                break;
+            }
+            case "spawn": {
+                if (display == null || argument.isEmpty()) return;
+                Desktop.spawn(display.id(), argument);
+                announce(true);
                 break;
             }
             case "close": {

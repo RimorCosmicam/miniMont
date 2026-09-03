@@ -31,6 +31,13 @@ object DesktopStore {
     /** How the app drawer lays its applications out. */
     enum class Drawer(val label: String) { LIST("List"), GRID("Grid") }
 
+    /** Which edge the taskbar holds. */
+    enum class Side(val label: String) {
+        BOTTOM("Bottom"), TOP("Top"), LEFT("Left"), RIGHT("Right");
+
+        val vertical: Boolean get() = this == LEFT || this == RIGHT
+    }
+
     /**
      * How thick the taskbar is.
      *
@@ -126,6 +133,7 @@ object DesktopStore {
          */
         val superFill: Boolean = false,
         val thickness: Thickness = Thickness.REGULAR,
+        val side: Side = Side.BOTTOM,
         /**
          * The display's density, which is the only lever over the size of Android's own controls.
          *
@@ -170,6 +178,9 @@ object DesktopStore {
                 Thickness.valueOf(preferences.getString(THICKNESS, null) ?: Thickness.REGULAR.name)
             }.getOrDefault(Thickness.REGULAR),
             density = preferences.getInt(DENSITY, 240),
+            side = runCatching {
+                Side.valueOf(preferences.getString(SIDE, null) ?: Side.BOTTOM.name)
+            }.getOrDefault(Side.BOTTOM),
             items = preferences.getString(ITEMS, "").orEmpty()
                 .split("\n").mapNotNull { Item.decode(it) }
         )
@@ -345,6 +356,11 @@ object DesktopStore {
         preferences.edit().putBoolean(SUPER_FILL, on).apply()
     }
 
+    fun setSide(side: Side) {
+        _state.update { it.copy(side = side) }
+        preferences.edit().putString(SIDE, side.name).apply()
+    }
+
     fun setDensity(density: Int) {
         _state.update { it.copy(density = density) }
         preferences.edit().putInt(DENSITY, density).apply()
@@ -363,17 +379,22 @@ object DesktopStore {
      * knowing how the desktop lays itself out beyond where the next thing goes.
      */
     fun nextCell(): Pair<Int, Int> {
+        // Starts inside whatever the bar has taken, so nothing new is ever put under it.
+        val state = _state.value
+        val extent = state.thickness.padding * 2 + state.thickness.icon + 6
+        val fromX = MARGIN + if (state.side == Side.LEFT) extent else 0
+        val fromY = MARGIN + if (state.side == Side.TOP) extent else 0
         val occupied = _state.value.items
             .flatMap { cells(it.x, it.y, it.width, it.height) }
             .toSet()
         for (row in 0 until 12) {
             for (column in 0 until 12) {
-                val x = MARGIN + column * WIDE
-                val y = MARGIN + row * TALL
+                val x = fromX + column * WIDE
+                val y = fromY + row * TALL
                 if ((x to y) !in occupied) return x to y
             }
         }
-        return MARGIN to MARGIN
+        return fromX to fromY
     }
 
     /** Put something on the desktop, where it was dropped. */
@@ -422,6 +443,7 @@ object DesktopStore {
     private const val SUPER_FILL = "super_fill"
     private const val THICKNESS = "thickness"
     private const val DENSITY = "density"
+    private const val SIDE = "side"
     private const val MIGRATED = "mont_wallpaper_migrated"
     private const val ITEMS = "desktop_items"
     private const val GRID_MIGRATED = "desktop_cells"

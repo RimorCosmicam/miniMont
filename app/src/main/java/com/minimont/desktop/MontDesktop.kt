@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -122,6 +123,7 @@ fun MontDesktop(
     onArea: (Int, Int, Int, Int) -> Unit,
     onOpenPhone: (String) -> Unit,
     onArrangeWindow: (String, String) -> Unit,
+    onSpawnWindow: (String) -> Unit,
     onBack: () -> Unit,
     onHome: () -> Unit,
     desktops: List<List<String>>,
@@ -161,13 +163,21 @@ fun MontDesktop(
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
     var bar by remember { mutableStateOf(0) }
-    LaunchedEffect(bar, configuration, store.thickness) {
+    LaunchedEffect(bar, configuration, store.thickness, store.side) {
         if (bar == 0) return@LaunchedEffect
         with(density) {
             val inset = (store.thickness.padding.dp * scaleOf(configuration)).roundToPx()
             val width = configuration.screenWidthDp.dp.roundToPx()
             val height = configuration.screenHeightDp.dp.roundToPx()
-            onArea(inset, inset, width - inset, height - bar - inset)
+            // The bar's own measurement is taken off the edge it is standing on, and the ordinary
+            // inset off the other three. It is the same number wherever the bar goes, which is why
+            // this is one expression rather than four.
+            onArea(
+                inset + if (store.side == DesktopStore.Side.LEFT) bar else 0,
+                inset + if (store.side == DesktopStore.Side.TOP) bar else 0,
+                width - inset - if (store.side == DesktopStore.Side.RIGHT) bar else 0,
+                height - inset - if (store.side == DesktopStore.Side.BOTTOM) bar else 0
+            )
         }
     }
 
@@ -178,184 +188,221 @@ fun MontDesktop(
         (store.pinned + running.filterNot { it in store.pinned }).mapNotNull { byPackage[it] }
     }
 
-    Column(Modifier.fillMaxWidth()) {
+    val side = store.side
+    val gap = store.thickness.gap.dp * LocalMontScale.current
 
-        // The two cards that belong to the right end of the bar open toward the right, where a
-        // shade has always been; everything else opens in the middle, above whatever opened it.
-        // Both float clear of the edge by the bar's own padding — a card held against the side of
-        // the screen stops being a card and becomes a sidebar, which is a different object with
-        // different rules.
-        val gap = store.thickness.padding.dp * LocalMontScale.current
-        val rightHand = panel == Panel.NOTIFICATIONS || panel == Panel.QUICK
-        Box(
-            Modifier.fillMaxWidth().padding(horizontal = gap),
-            contentAlignment = if (rightHand) Alignment.CenterEnd else Alignment.Center
-        ) {
-
-        when (panel) {
-            Panel.APPS -> StartMenu(
-                apps = apps,
-                settings = store,
-                bar = with(density) { bar.toDp() }.value.toInt(),
-                area = store.thickness.padding,
+    val barContent = @Composable {
+            Taskbar(
+                apps = docked,
+                running = running,
+                thickness = store.thickness,
+                side = store.side,
+                onStart = { panel = if (panel == Panel.APPS) Panel.NONE else Panel.APPS },
+                // Launching an app that is already open brings its window forward, which is what
+                // clicking a taskbar icon means in every desktop anybody has used.
                 onOpen = { app ->
                     panel = Panel.NONE
                     onLaunch(app.component)
                 },
-                onSettings = { panel = Panel.SETTINGS },
-                onClose = { panel = Panel.NONE }
-            )
-
-            Panel.SETTINGS -> SettingsCard(
-                state = store,
-                notifications = Notifications.granted(context),
-                section = section,
-                onSection = { section = it },
-                onPickImage = {
-                    panel = Panel.NONE
-                    onPickImage()
+                onHold = { app ->
+                    selected = app
+                    panel = Panel.ITEM
                 },
-                onGrantNotifications = {
-                    panel = Panel.NONE
-                    onGrantNotifications()
+                onMeasured = { bar = it },
+                onBack = onBack,
+                onHome = onHome,
+                onWindows = { panel = if (panel == Panel.WINDOWS) Panel.NONE else Panel.WINDOWS },
+                onClock = { panel = if (panel == Panel.CALENDAR) Panel.NONE else Panel.CALENDAR },
+                onClockMenu = { panel = Panel.CLOCK_MENU },
+                onBattery = { panel = if (panel == Panel.QUICK) Panel.NONE else Panel.QUICK },
+                onBatteryMenu = { panel = Panel.BATTERY_MENU },
+                onNotifications = {
+                    panel = if (panel == Panel.NOTIFICATIONS) Panel.NONE else Panel.NOTIFICATIONS
                 },
-                onClose = { panel = Panel.NONE }
+                onNotificationMenu = { panel = Panel.NOTIFICATION_MENU }
             )
+    }
 
-            Panel.ITEM -> selected?.let { app ->
-                ItemCard(
-                    app = app,
-                    pinned = app.packageName in store.pinned,
-                    open = app.packageName in running,
-                    onPin = { DesktopStore.togglePin(app.packageName) },
-                    onClose = {
-                        onClose(app.packageName)
+    val cards = @Composable {
+
+            // The two cards that belong to the right end of the bar open toward the right, where a
+            // shade has always been; everything else opens in the middle, above whatever opened it.
+            // Both float clear of the edge by the bar's own padding — a card held against the side of
+            // the screen stops being a card and becomes a sidebar, which is a different object with
+            // different rules.
+            val gap = store.thickness.padding.dp * LocalMontScale.current
+            val rightHand = panel == Panel.NOTIFICATIONS || panel == Panel.QUICK
+            Box(
+                Modifier.fillMaxWidth().padding(horizontal = gap),
+                contentAlignment = if (rightHand) Alignment.CenterEnd else Alignment.Center
+            ) {
+
+            when (panel) {
+                Panel.APPS -> StartMenu(
+                    apps = apps,
+                    settings = store,
+                    bar = with(density) { bar.toDp() }.value.toInt(),
+                    area = store.thickness.padding,
+                    onOpen = { app ->
                         panel = Panel.NONE
+                        onLaunch(app.component)
                     },
-                    onFit = {
-                        onFit(app.packageName)
+                    onSettings = { panel = Panel.SETTINGS },
+                    onClose = { panel = Panel.NONE }
+                )
+
+                Panel.SETTINGS -> SettingsCard(
+                    state = store,
+                    notifications = Notifications.granted(context),
+                    section = section,
+                    onSection = { section = it },
+                    onPickImage = {
+                        panel = Panel.NONE
+                        onPickImage()
+                    },
+                    onGrantNotifications = {
+                        panel = Panel.NONE
+                        onGrantNotifications()
+                    },
+                    onClose = { panel = Panel.NONE }
+                )
+
+                Panel.ITEM -> selected?.let { app ->
+                    ItemCard(
+                        app = app,
+                        pinned = app.packageName in store.pinned,
+                        open = app.packageName in running,
+                        onPin = { DesktopStore.togglePin(app.packageName) },
+                        onClose = {
+                            onClose(app.packageName)
+                            panel = Panel.NONE
+                        },
+                        onFit = {
+                            onFit(app.packageName)
+                            panel = Panel.NONE
+                        },
+                        onSpawn = {
+                        onSpawnWindow(app.component)
                         panel = Panel.NONE
                     },
                     onArrange = { where ->
-                        onArrangeWindow(app.packageName, where)
+                            onArrangeWindow(app.packageName, where)
+                            panel = Panel.NONE
+                        },
+                        onInfo = {
+                            panel = Panel.NONE
+                            // Android's own page for the app, opened on the desktop like anything else.
+                            onOpenPhone("${Phone.APP_INFO} package:${app.packageName}")
+                        },
+                        onDismiss = { panel = Panel.NONE }
+                    )
+                }
+
+                Panel.QUICK -> QuickCard(
+                    running = running,
+                    onWifi = onWifi,
+                    onBatterySaver = onBatterySaver,
+                    onCloseAll = {
+                        running.forEach(onClose)
                         panel = Panel.NONE
                     },
-                    onInfo = {
+                    onSettings = { panel = Panel.SETTINGS },
+                    onClose = { panel = Panel.NONE }
+                )
+
+                Panel.WIDGETS -> WidgetPicker { panel = Panel.NONE }
+
+                Panel.WINDOWS -> DesktopsCard(
+                    desktops = desktops,
+                    current = desktop,
+                    apps = apps,
+                    onShow = { index ->
                         panel = Panel.NONE
-                        // Android's own page for the app, opened on the desktop like anything else.
-                        onOpenPhone("${Phone.APP_INFO} package:${app.packageName}")
+                        onShowDesktop(index)
+                    },
+                    onAdd = onAddDesktop,
+                    onRemove = onRemoveDesktop,
+                    onDismiss = { panel = Panel.NONE }
+                )
+
+                Panel.CLOCK_MENU -> MenuCard(
+                    title = "CLOCK",
+                    rows = listOf(
+                        "Alarms" to Phone.ALARMS,
+                        "Date and time" to Phone.DATE_TIME
+                    ),
+                    onOpen = { action ->
+                        panel = Panel.NONE
+                        onOpenPhone(action)
                     },
                     onDismiss = { panel = Panel.NONE }
                 )
-            }
 
-            Panel.QUICK -> QuickCard(
-                running = running,
-                onWifi = onWifi,
-                onBatterySaver = onBatterySaver,
-                onCloseAll = {
-                    running.forEach(onClose)
-                    panel = Panel.NONE
-                },
-                onSettings = { panel = Panel.SETTINGS },
-                onClose = { panel = Panel.NONE }
-            )
-
-            Panel.WIDGETS -> WidgetPicker { panel = Panel.NONE }
-
-            Panel.WINDOWS -> DesktopsCard(
-                desktops = desktops,
-                current = desktop,
-                apps = apps,
-                onShow = { index ->
-                    panel = Panel.NONE
-                    onShowDesktop(index)
-                },
-                onAdd = onAddDesktop,
-                onRemove = onRemoveDesktop,
-                onDismiss = { panel = Panel.NONE }
-            )
-
-            Panel.CLOCK_MENU -> MenuCard(
-                title = "CLOCK",
-                rows = listOf(
-                    "Alarms" to Phone.ALARMS,
-                    "Date and time" to Phone.DATE_TIME
-                ),
-                onOpen = { action ->
-                    panel = Panel.NONE
-                    onOpenPhone(action)
-                },
-                onDismiss = { panel = Panel.NONE }
-            )
-
-            Panel.BATTERY_MENU -> MenuCard(
-                title = "BATTERY",
-                rows = listOf(
-                    "Battery usage" to Phone.BATTERY,
-                    "Battery saver" to Phone.BATTERY_SAVER
-                ),
-                onOpen = { action ->
-                    panel = Panel.NONE
-                    onOpenPhone(action)
-                },
-                onDismiss = { panel = Panel.NONE }
-            )
-
-            Panel.NOTIFICATION_MENU -> MenuCard(
-                title = "NOTIFICATIONS",
-                rows = listOf("Notification settings" to Phone.NOTIFICATIONS),
-                leading = {
-                    MontRow(label = "Clear all") {
-                        Notifications.dismissAll()
+                Panel.BATTERY_MENU -> MenuCard(
+                    title = "BATTERY",
+                    rows = listOf(
+                        "Battery usage" to Phone.BATTERY,
+                        "Battery saver" to Phone.BATTERY_SAVER
+                    ),
+                    onOpen = { action ->
                         panel = Panel.NONE
-                    }
-                },
-                onOpen = { action ->
-                    panel = Panel.NONE
-                    onOpenPhone(action)
-                },
-                onDismiss = { panel = Panel.NONE }
-            )
+                        onOpenPhone(action)
+                    },
+                    onDismiss = { panel = Panel.NONE }
+                )
 
-            Panel.CALENDAR -> CalendarCard { panel = Panel.NONE }
+                Panel.NOTIFICATION_MENU -> MenuCard(
+                    title = "NOTIFICATIONS",
+                    rows = listOf("Notification settings" to Phone.NOTIFICATIONS),
+                    leading = {
+                        MontRow(label = "Clear all") {
+                            Notifications.dismissAll()
+                            panel = Panel.NONE
+                        }
+                    },
+                    onOpen = { action ->
+                        panel = Panel.NONE
+                        onOpenPhone(action)
+                    },
+                    onDismiss = { panel = Panel.NONE }
+                )
 
-            Panel.NOTIFICATIONS -> NotificationsCard { panel = Panel.NONE }
+                Panel.CALENDAR -> CalendarCard { panel = Panel.NONE }
 
-            Panel.NONE -> Unit
+                Panel.NOTIFICATIONS -> NotificationsCard { panel = Panel.NONE }
+
+                Panel.NONE -> Unit
+            }
+            }
+    }
+
+    // The bar holds its edge and the cards open away from it. A row and a column are not
+    // the same object with a flag on it, so there is one layout each way rather than a clever
+    // one doing both — which is how padding ends up on the wrong side.
+    when (side) {
+        DesktopStore.Side.BOTTOM -> Column(Modifier.fillMaxWidth()) {
+            cards()
+            Spacer(Modifier.height(gap))
+            barContent()
         }
+
+        DesktopStore.Side.TOP -> Column(Modifier.fillMaxWidth()) {
+            barContent()
+            Spacer(Modifier.height(gap))
+            cards()
         }
 
-        Spacer(Modifier.height(store.thickness.gap.dp * LocalMontScale.current))
+        DesktopStore.Side.LEFT -> Row(Modifier.fillMaxHeight()) {
+            barContent()
+            Spacer(Modifier.width(gap))
+            cards()
+        }
 
-        Taskbar(
-            apps = docked,
-            running = running,
-            thickness = store.thickness,
-            onStart = { panel = if (panel == Panel.APPS) Panel.NONE else Panel.APPS },
-            // Launching an app that is already open brings its window forward, which is what
-            // clicking a taskbar icon means in every desktop anybody has used.
-            onOpen = { app ->
-                panel = Panel.NONE
-                onLaunch(app.component)
-            },
-            onHold = { app ->
-                selected = app
-                panel = Panel.ITEM
-            },
-            onMeasured = { bar = it },
-            onBack = onBack,
-            onHome = onHome,
-            onWindows = { panel = if (panel == Panel.WINDOWS) Panel.NONE else Panel.WINDOWS },
-            onClock = { panel = if (panel == Panel.CALENDAR) Panel.NONE else Panel.CALENDAR },
-            onClockMenu = { panel = Panel.CLOCK_MENU },
-            onBattery = { panel = if (panel == Panel.QUICK) Panel.NONE else Panel.QUICK },
-            onBatteryMenu = { panel = Panel.BATTERY_MENU },
-            onNotifications = {
-                panel = if (panel == Panel.NOTIFICATIONS) Panel.NONE else Panel.NOTIFICATIONS
-            },
-            onNotificationMenu = { panel = Panel.NOTIFICATION_MENU }
-        )
+        DesktopStore.Side.RIGHT -> Row(Modifier.fillMaxHeight()) {
+            cards()
+            Spacer(Modifier.width(gap))
+            barContent()
+        }
     }
 }
 
@@ -747,6 +794,15 @@ private fun add(context: android.content.Context, provider: AppWidgetProviderEnt
 private fun TaskbarSection(state: DesktopStore.State) {
     val scale = LocalMontScale.current
     val options = DesktopStore.Thickness.entries
+    MontLabel("POSITION", size = 11, alpha = MontWhite.DETAIL)
+    Spacer(Modifier.height(6.dp * scale))
+    val sides = DesktopStore.Side.entries
+    MontChips(
+        options = sides.map { it.label },
+        selected = sides.indexOf(state.side)
+    ) { index -> DesktopStore.setSide(sides[index]) }
+
+    Spacer(Modifier.height(14.dp * scale))
     MontLabel("THICKNESS", size = 11, alpha = MontWhite.DETAIL)
     Spacer(Modifier.height(6.dp * scale))
     MontChips(
@@ -836,6 +892,7 @@ private fun ItemCard(
     onFit: () -> Unit,
     onInfo: () -> Unit,
     onArrange: (String) -> Unit,
+    onSpawn: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val scale = LocalMontScale.current
@@ -846,6 +903,7 @@ private fun ItemCard(
             onPin()
             onDismiss()
         }
+        MontRow(label = "New window") { onSpawn() }
         MontRow(label = "App info") { onInfo() }
 
         if (open) {
@@ -903,6 +961,7 @@ private fun Taskbar(
     apps: List<DesktopApp>,
     running: List<String>,
     thickness: DesktopStore.Thickness,
+    side: DesktopStore.Side,
     onStart: () -> Unit,
     onOpen: (DesktopApp) -> Unit,
     onHold: (DesktopApp) -> Unit,
@@ -918,24 +977,30 @@ private fun Taskbar(
     onNotificationMenu: () -> Unit
 ) {
     val scale = LocalMontScale.current
+    val vertical = side.vertical
+
+    // Along its edge: a band across the screen, or a column down it. Measured on the axis it does
+    // not span, which is the number everything else needs — how much of the display the bar has
+    // taken away from the windows.
     Box(
         Modifier
-            .fillMaxWidth()
+            .then(if (vertical) Modifier.fillMaxHeight() else Modifier.fillMaxWidth())
             .background(MontSurface)
-            .onSizeChanged { onMeasured(it.height) }
+            .onSizeChanged { onMeasured(if (vertical) it.width else it.height) }
             .padding(thickness.padding.dp * scale)
     ) {
         Navigation(
-            Modifier.align(Alignment.CenterStart),
+            Modifier.align(if (vertical) Alignment.TopCenter else Alignment.CenterStart),
             thickness = thickness,
+            vertical = vertical,
             onBack = onBack,
             onHome = onHome,
             onWindows = onWindows
         )
-        Row(
+        TaskbarRun(
             Modifier.align(Alignment.Center),
-            horizontalArrangement = Arrangement.spacedBy(9.dp * scale),
-            verticalAlignment = Alignment.CenterVertically
+            vertical = vertical,
+            spacing = 9.dp * scale
         ) {
             // Built the same way a taskbar item is, dot and all — the dot simply never drawn.
             //
@@ -951,8 +1016,9 @@ private fun Taskbar(
             }
         }
         StatusBlock(
-            Modifier.align(Alignment.CenterEnd),
+            Modifier.align(if (vertical) Alignment.BottomCenter else Alignment.CenterEnd),
             thickness = thickness,
+            vertical = vertical,
             onClock = onClock,
             onClockMenu = onClockMenu,
             onBattery = onBattery,
@@ -960,6 +1026,29 @@ private fun Taskbar(
             onNotifications = onNotifications,
             onNotificationMenu = onNotificationMenu
         )
+    }
+}
+
+/** A row or a column, depending on which way the bar is running. */
+@Composable
+private fun TaskbarRun(
+    modifier: Modifier = Modifier,
+    vertical: Boolean,
+    spacing: androidx.compose.ui.unit.Dp,
+    content: @Composable () -> Unit
+) {
+    if (vertical) {
+        Column(
+            modifier,
+            verticalArrangement = Arrangement.spacedBy(spacing),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) { content() }
+    } else {
+        Row(
+            modifier,
+            horizontalArrangement = Arrangement.spacedBy(spacing),
+            verticalAlignment = Alignment.CenterVertically
+        ) { content() }
     }
 }
 
@@ -981,16 +1070,13 @@ private fun Taskbar(
 private fun Navigation(
     modifier: Modifier = Modifier,
     thickness: DesktopStore.Thickness,
+    vertical: Boolean,
     onBack: () -> Unit,
     onHome: () -> Unit,
     onWindows: () -> Unit
 ) {
     val scale = LocalMontScale.current
-    Row(
-        modifier,
-        horizontalArrangement = Arrangement.spacedBy(10.dp * scale),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    TaskbarRun(modifier, vertical = vertical, spacing = 10.dp * scale) {
         NavMark(Mark.BACK, thickness, onBack)
         NavMark(Mark.HOME, thickness, onHome)
         NavMark(Mark.RECENTS, thickness, onWindows)
@@ -1153,6 +1239,7 @@ private fun DockItem(
 private fun StatusBlock(
     modifier: Modifier = Modifier,
     thickness: DesktopStore.Thickness,
+    vertical: Boolean = false,
     onClock: () -> Unit,
     onClockMenu: () -> Unit,
     onBattery: () -> Unit,
@@ -1178,11 +1265,7 @@ private fun StatusBlock(
     val date = remember(now) { SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(now) }
     val level = if (battery in 1..19) MontAccent.LowBattery else MontAccent.Live
 
-    Row(
-        modifier,
-        horizontalArrangement = Arrangement.spacedBy(14.dp * scale),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    TaskbarRun(modifier, vertical = vertical, spacing = 14.dp * scale) {
         // Nothing announces itself: with nothing waiting there is no bubble, not an empty one.
         if (notes.isNotEmpty()) {
             Bubble(
@@ -1214,7 +1297,9 @@ private fun StatusBlock(
             horizontalAlignment = Alignment.End
         ) {
             MontLabel(time, size = thickness.time, alpha = MontWhite.PRIMARY)
-            MontLabel(date, size = thickness.date, alpha = MontWhite.DETAIL)
+            // Down the side there is no room for a date beside a clock, and a bar you have to widen
+            // to read the month is a bar in the wrong shape.
+            if (!vertical) MontLabel(date, size = thickness.date, alpha = MontWhite.DETAIL)
         }
     }
 }
