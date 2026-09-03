@@ -130,6 +130,8 @@ fun MontDesktop(
     onHome: () -> Unit,
     desktops: List<List<String>>,
     desktop: Int,
+    armed: Boolean,
+    onArm: () -> Unit,
     onShowDesktop: (Int) -> Unit,
     onAddDesktop: () -> Unit,
     onRemoveDesktop: (Int) -> Unit
@@ -199,6 +201,7 @@ fun MontDesktop(
                 running = running,
                 thickness = store.thickness,
                 side = store.side,
+                armed = armed,
                 onStart = { panel = if (panel == Panel.APPS) Panel.NONE else Panel.APPS },
                 // Launching an app that is already open brings its window forward, which is what
                 // clicking a taskbar icon means in every desktop anybody has used.
@@ -221,7 +224,8 @@ fun MontDesktop(
                 onNotifications = {
                     panel = if (panel == Panel.NOTIFICATIONS) Panel.NONE else Panel.NOTIFICATIONS
                 },
-                onNotificationMenu = { panel = Panel.NOTIFICATION_MENU }
+                onNotificationMenu = { panel = Panel.NOTIFICATION_MENU },
+                onArm = onArm
             )
     }
 
@@ -976,6 +980,7 @@ private fun Taskbar(
     running: List<String>,
     thickness: DesktopStore.Thickness,
     side: DesktopStore.Side,
+    armed: Boolean,
     onStart: () -> Unit,
     onOpen: (DesktopApp) -> Unit,
     onHold: (DesktopApp) -> Unit,
@@ -988,7 +993,8 @@ private fun Taskbar(
     onBattery: () -> Unit,
     onBatteryMenu: () -> Unit,
     onNotifications: () -> Unit,
-    onNotificationMenu: () -> Unit
+    onNotificationMenu: () -> Unit,
+    onArm: () -> Unit
 ) {
     val scale = LocalMontScale.current
     val vertical = side.vertical
@@ -1007,9 +1013,11 @@ private fun Taskbar(
             Modifier.align(if (vertical) Alignment.TopCenter else Alignment.CenterStart),
             thickness = thickness,
             vertical = vertical,
+            armed = armed,
             onBack = onBack,
             onHome = onHome,
-            onWindows = onWindows
+            onWindows = onWindows,
+            onArm = onArm
         )
         TaskbarRun(
             Modifier.align(Alignment.Center),
@@ -1085,43 +1093,68 @@ private fun Navigation(
     modifier: Modifier = Modifier,
     thickness: DesktopStore.Thickness,
     vertical: Boolean,
+    armed: Boolean,
     onBack: () -> Unit,
     onHome: () -> Unit,
-    onWindows: () -> Unit
+    onWindows: () -> Unit,
+    onArm: () -> Unit
 ) {
     val scale = LocalMontScale.current
     TaskbarRun(modifier, vertical = vertical, spacing = 10.dp * scale) {
-        NavMark(Mark.BACK, thickness, onBack)
-        NavMark(Mark.HOME, thickness, onHome)
-        NavMark(Mark.RECENTS, thickness, onWindows)
+        NavMark(Mark.BACK, thickness, onClick = onBack)
+        // Home twice arms a right click.
+        //
+        // A double tap on home would otherwise be showing the desktop and coming straight back —
+        // in and out, which is nothing — so the gesture was free. It stays nothing: the single tap
+        // is held until the double-tap window has passed, so arming never flashes the desktop on
+        // the way. The mark turns mustard and stays that way until a click is spent, because a
+        // mode you cannot see is a mode you will be surprised by.
+        NavMark(
+            Mark.HOME,
+            thickness,
+            colour = if (armed) MontAccent.Mustard else null,
+            onClick = onHome,
+            onDoubleClick = onArm
+        )
+        NavMark(Mark.RECENTS, thickness, onClick = onWindows)
     }
 }
 
 private enum class Mark { BACK, HOME, RECENTS }
 
 @Composable
-private fun NavMark(mark: Mark, thickness: DesktopStore.Thickness, onClick: () -> Unit) {
+private fun NavMark(
+    mark: Mark,
+    thickness: DesktopStore.Thickness,
+    colour: Color? = null,
+    onClick: () -> Unit,
+    onDoubleClick: (() -> Unit)? = null
+) {
     val scale = LocalMontScale.current
     var held by remember { mutableStateOf(false) }
-    val alpha = if (held) MontWhite.ACTIVE else MontWhite.DIM
+    val alpha = if (held || colour != null) MontWhite.ACTIVE else MontWhite.DIM
 
     Box(
         Modifier
             .size(thickness.icon.dp * scale)
-            .pointerInput(mark) {
+            .pointerInput(mark, onDoubleClick) {
                 detectTapGestures(
                     onPress = {
                         held = true
-                        onClick()
+                        // Without a double tap to wait for, the press is the click: a control that
+                        // answers on release when it does not have to is a control that feels slow.
+                        if (onDoubleClick == null) onClick()
                         tryAwaitRelease()
                         held = false
-                    }
+                    },
+                    onTap = { if (onDoubleClick != null) onClick() },
+                    onDoubleTap = { onDoubleClick?.invoke() }
                 )
             },
         contentAlignment = Alignment.Center
     ) {
         Canvas(Modifier.size((thickness.icon / 2 + 1).dp * scale)) {
-            val colour = Color.White.copy(alpha = alpha)
+            val colour = colour ?: Color.White.copy(alpha = alpha)
             val line = Stroke(width = 1.6f * scale)
             when (mark) {
                 // A chevron: two strokes meeting at a point, and no shaft. An arrow points at

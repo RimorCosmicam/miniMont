@@ -76,7 +76,9 @@ data class DesktopState(
     val openApps: List<String> = emptyList(),
     /** What is on each virtual desktop, in order, and which one is showing. */
     val desktops: List<List<String>> = listOf(emptyList()),
-    val desktop: Int = 0
+    val desktop: Int = 0,
+    /** Whether the next click has been asked to be a right click. */
+    val armed: Boolean = false
 ) {
     /** The sizes worth offering: the ordinary ones, minus anything past the client's decoder. */
     val choices: List<Pair<Int, Int>>
@@ -306,6 +308,11 @@ class DesktopController private constructor(private val context: Context) {
                                     "Try it with One UI's own decorations switched on."
                             )
                         }
+                        line.startsWith("[EVENT] armed") -> {
+                            val on = line.trim().endsWith("1")
+                            _state.update { it.copy(armed = on) }
+                        }
+
                         line.startsWith("[EVENT] desks") -> {
                             val rest = line.substringAfter("desks").trim()
                             val current = rest.substringBefore(' ').toIntOrNull() ?: 0
@@ -446,6 +453,9 @@ class DesktopController private constructor(private val context: Context) {
      */
     fun setArea(left: Int, top: Int, right: Int, bottom: Int) =
         send("area $left $top $right $bottom")
+
+    /** Make the next click a right click, wherever it comes from. */
+    fun armRightClick() = send("arm")
 
     /** Virtual desktops: show one, make one, take one away. */
     fun showDesktop(index: Int) = send("desk show $index")

@@ -61,6 +61,16 @@ public final class Server {
     private Input input;
     /** Read by the control thread and written by the session thread, so it is read as it is. */
     private volatile Pointer pointer;
+
+    /**
+     * The next click, whichever surface it arrives from, is a right click.
+     *
+     * The tablet's touchscreen can only say "tap" — no press, no release, no duration — so a hold
+     * cannot be recognised there however long anybody holds. What can be recognised is a deliberate
+     * arming beforehand, and then any click at all becomes the one that was asked for. It is held
+     * here rather than in the app because a tap on the tablet never passes through the app.
+     */
+    private volatile boolean armRight;
     private Desktops desks;
 
     private int width;
@@ -325,6 +335,11 @@ public final class Server {
                 if (!argument.isEmpty()) Desktop.fit(argument);
                 break;
             }
+            case "arm": {
+                armRight = true;
+                Ln.i("EVENT", "armed 1");
+                break;
+            }
             case "wifi": {
                 Desktop.wifi("1".equals(argument));
                 break;
@@ -356,6 +371,10 @@ public final class Server {
                 String[] parts = argument.split(" ");
                 int button = Integer.parseInt(parts[0]);
                 boolean down = "1".equals(parts[1]);
+                if (armRight && button == 1) {
+                    button = 2;
+                    if (!down) disarm();
+                }
                 float x = pointer.x();
                 float y = pointer.y();
 
@@ -485,6 +504,11 @@ public final class Server {
 
     /** How close to an edge counts as being at it. */
     private static final int EDGE = 12;
+
+    private void disarm() {
+        armRight = false;
+        Ln.i("EVENT", "armed 0");
+    }
 
     private static String packageOf(String component) {
         int slash = component.indexOf('/');
@@ -634,9 +658,28 @@ public final class Server {
                 if (wantRunning) startSession();
                 break;
             case Protocol.TYPE_CLICK:
+                if (armRight && pointer != null) {
+                    // Placed and pressed rather than tapped: a tap is a finger, and a finger has no
+                    // second button to press.
+                    pointer.moveTo(
+                            (float) command.x * width / 65535f,
+                            (float) command.y * height / 65535f);
+                    pointer.button(2, true);
+                    pointer.button(2, false);
+                    disarm();
+                    break;
+                }
+                // Logged to Android's own log as well as ours, so what the tablet actually sends
+                // can be read from outside this process. A hold on a touchscreen can only become a
+                // right click if the client says enough for one to be recognised, and nothing so
+                // far says whether it does.
+                android.util.Log.i("miniMont", "tablet click " + command.x + "," + command.y);
                 if (input != null) input.click(command.x, command.y);
                 break;
             case Protocol.TYPE_SCROLL:
+                android.util.Log.i("miniMont", "tablet scroll phase=" + command.phase
+                        + " at " + command.x + "," + command.y
+                        + " by " + command.dx + "," + command.dy);
                 if (input != null) input.scroll(command.phase, command.x, command.y, command.dx, command.dy);
                 break;
             case Protocol.TYPE_CLIENT_DISPLAY:

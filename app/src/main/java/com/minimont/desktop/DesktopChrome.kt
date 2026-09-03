@@ -101,6 +101,8 @@ class DesktopChrome(
                         // Home shows the desktop rather than leaving for the phone's launcher.
                         // Leaving would end the thing you are using.
                         onHome = controller::showBackdrop,
+                        armed = state.armed,
+                        onArm = controller::armRightClick,
                         desktops = state.desktops,
                         desktop = state.desktop,
                         onShowDesktop = controller::showDesktop,

@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -45,14 +44,6 @@ import androidx.compose.ui.graphics.luminance
 import com.minimont.cover.theme.LocalMiniDexColors
 import kotlinx.coroutines.launch
 import kotlin.math.hypot
-import kotlinx.coroutines.delay
-
-/** How long a finger has to stay still to become a right click, and how far it may stray. */
-private const val HOLD_MILLIS = 650L
-private const val HOLD_SLOP = 14f
-
-/** Mont's one accent, for the one control that has to be found without being read. */
-private val MUSTARD = Color(0xFFD8A628)
 
 data class TouchRipple(
     val x: Float,
@@ -89,37 +80,6 @@ fun TouchpadView(
     // Visual touch indicator ripples
     val ripples = remember { mutableStateListOf<TouchRipple>() }
 
-    // Hold a finger still and it becomes a right click.
-    //
-    // Two fingers tapped together is the gesture a trackpad uses and a three-inch pad under one
-    // thumb is not a trackpad — it is the thumb you are already holding the phone with. So the
-    // right button is a press you keep, and it says so while you keep it: a dark ring that fills
-    // with mustard, and fires when it is full.
-    var holdAt by remember { mutableStateOf<Offset?>(null) }
-    var holdStart by remember { mutableLongStateOf(0L) }
-    var holdProgress by remember { mutableFloatStateOf(0f) }
-    var holdFired by remember { mutableStateOf(false) }
-
-    LaunchedEffect(holdStart) {
-        if (holdStart == 0L) {
-            holdProgress = 0f
-            return@LaunchedEffect
-        }
-        while (true) {
-            val elapsed = SystemClock.uptimeMillis() - holdStart
-            holdProgress = (elapsed.toFloat() / HOLD_MILLIS).coerceIn(0f, 1f)
-            if (elapsed >= HOLD_MILLIS) {
-                onPointerClick(2)
-                onHapticClick()
-                holdFired = true
-                holdStart = 0L
-                holdAt = null
-                return@LaunchedEffect
-            }
-            delay(16)
-        }
-    }
-
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -143,22 +103,12 @@ fun TouchpadView(
                             onHapticClick()
                         }
 
-                        // The wait starts unless this press is already a drag continuing.
-                        holdFired = false
-                        if (!isDragging) {
-                            holdAt = Offset(motionEvent.x, motionEvent.y)
-                            holdStart = now
-                        }
-
                         ripples.add(TouchRipple(motionEvent.x, motionEvent.y, now, Color.White))
                         if (ripples.size > 8) ripples.removeAt(0)
                         true
                     }
 
                     MotionEvent.ACTION_POINTER_DOWN -> {
-                        // A second finger is a different gesture; the wait is off.
-                        holdStart = 0L
-                        holdAt = null
                         maxPointerCount = maxOf(maxPointerCount, motionEvent.pointerCount)
                         // Multi-touch started (e.g. 2 fingers)
                         if (motionEvent.pointerCount == 2) {
@@ -178,11 +128,6 @@ fun TouchpadView(
                             val rawDy = currentY - lastTouchY
 
                             totalMovedDistance += hypot(rawDx, rawDy)
-                            // Moving is pointing, not holding.
-                            if (holdStart != 0L && totalMovedDistance > HOLD_SLOP) {
-                                holdStart = 0L
-                                holdAt = null
-                            }
 
                             val (dx, dy) = TouchpadKinematics.calculatePointerDelta(
                                 rawDx = rawDx,
@@ -201,11 +146,6 @@ fun TouchpadView(
                             val rawDx = avgX - lastTouchX
                             val rawDy = avgY - lastTouchY
                             totalMovedDistance += hypot(rawDx, rawDy)
-                            // Moving is pointing, not holding.
-                            if (holdStart != 0L && totalMovedDistance > HOLD_SLOP) {
-                                holdStart = 0L
-                                holdAt = null
-                            }
 
                             val (scrollX, scrollY) = TouchpadKinematics.calculateScrollDelta(
                                 rawDx = rawDx,
@@ -237,8 +177,6 @@ fun TouchpadView(
                     }
 
                     MotionEvent.ACTION_UP -> {
-                        holdStart = 0L
-                        holdAt = null
                         val duration = now - touchDownTime
                         if (isDragging) {
                             isDragging = false
@@ -246,8 +184,6 @@ fun TouchpadView(
                             onHapticClick()
                         } else if (
                             maxPointerCount == 1 &&
-                            // A hold that already fired is not also a tap.
-                            !holdFired &&
                             !multiTapHandled &&
                             totalMovedDistance < 15f &&
                             duration < 250L &&
@@ -286,26 +222,6 @@ fun TouchpadView(
         // The only thing drawn on the pad is the answer to a touch.
         Canvas(modifier = Modifier.fillMaxSize()) {
             val now = SystemClock.uptimeMillis()
-
-            // The wait, drawn where the finger is: a dark ring filling with mustard.
-            holdAt?.let { at ->
-                val radius = 26.dp.toPx()
-                drawCircle(
-                    Color.Black.copy(alpha = .55f),
-                    radius = radius,
-                    center = at,
-                    style = Stroke(width = 3.dp.toPx())
-                )
-                drawArc(
-                    color = MUSTARD,
-                    startAngle = -90f,
-                    sweepAngle = 360f * holdProgress,
-                    useCenter = false,
-                    topLeft = Offset(at.x - radius, at.y - radius),
-                    size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2),
-                    style = Stroke(width = 3.dp.toPx())
-                )
-            }
 
             // Active ripples
             ripples.forEach { ripple ->
