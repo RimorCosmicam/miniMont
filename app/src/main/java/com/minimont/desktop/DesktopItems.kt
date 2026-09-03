@@ -388,9 +388,15 @@ private fun Widget(
     onHold: () -> Unit
 ) {
     val context = LocalContext.current
-    val density = LocalDensity.current
-    var width by remember(item.id) { mutableStateOf(item.width.toFloat()) }
-    var height by remember(item.id) { mutableStateOf(item.height.toFloat()) }
+
+    // The item's own size, read every time, not remembered.
+    //
+    // It used to be held in local state keyed on the item's id, left over from when a corner could
+    // be dragged. The id does not change when the size does, so picking a size from the resize menu
+    // wrote it down and the widget went on drawing itself at the size it started with — the setting
+    // took and nothing happened, which is the worst shape a bug can have.
+    val width = item.width.toFloat()
+    val height = item.height.toFloat()
 
     Box(
         Modifier
