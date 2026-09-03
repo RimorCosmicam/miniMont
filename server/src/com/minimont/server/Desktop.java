@@ -189,6 +189,32 @@ public final class Desktop {
         return Tasks.resize(taskId, left, top, left + width, top + height);
     }
 
+    /**
+     * Put back anything Android has just filled the screen with.
+     *
+     * Its own caption offers a maximise, and that maximise is the *display* — it fills every pixel,
+     * so the window ends up under the taskbar with its bottom edge somewhere behind the clock. We
+     * cannot remove that control, so the answer is to notice what it did and undo it.
+     *
+     * Only an exact fill is touched. A window dragged half off the edge is somebody putting it
+     * there on purpose and is left alone; a window that is precisely the size of the display is one
+     * nobody dragged, because you cannot drag a window to the pixel.
+     */
+    public static void keepOffTheBar(int displayId, int width, int height) {
+        int[] safe = area;
+        if (safe[2] <= safe[0] || safe[3] <= safe[1]) return;
+        for (int[] window : Tasks.windows(displayId, "com.minimont")) {
+            boolean filled = window[1] <= SLACK && window[2] <= SLACK
+                    && window[3] >= width - SLACK && window[4] >= height - SLACK;
+            if (!filled) continue;
+            Ln.i("DESKTOP", "task " + window[0] + " was filled to the display; holding it off the bar");
+            Tasks.resize(window[0], safe[0], safe[1], safe[2], safe[3]);
+        }
+    }
+
+    /** How far off the display's own edges still counts as filling it. */
+    private static final int SLACK = 8;
+
     private static int clamp(int value, int low, int high) {
         return value < low ? low : (value > high ? high : value);
     }

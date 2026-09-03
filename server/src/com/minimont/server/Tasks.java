@@ -51,6 +51,27 @@ public final class Tasks {
      * one: a resize that happens once per action can afford a process, and one that happens per
      * frame cannot.
      */
+    /**
+     * Every window on a display, as {taskId, left, top, right, bottom}.
+     *
+     * Read on the status tick, for one job: noticing when something has been maximised by Android's
+     * own caption, which fills the display and knows nothing about a taskbar.
+     */
+    public static java.util.List<int[]> windows(int displayId, String exclude) {
+        java.util.List<int[]> out = new ArrayList<>();
+        for (Object task : rootTasks()) {
+            Integer display = number(task, "displayId");
+            Integer id = number(task, "taskId");
+            if (display == null || id == null || display != displayId) continue;
+            String name = packageOf(task);
+            if (name == null || name.equals(exclude)) continue;
+            int[] bounds = bounds(task);
+            if (bounds[2] <= bounds[0] || bounds[3] <= bounds[1]) continue;
+            out.add(new int[] { id, bounds[0], bounds[1], bounds[2], bounds[3] });
+        }
+        return out;
+    }
+
     public static boolean resize(int taskId, int left, int top, int right, int bottom) {
         try {
             Object service = service();

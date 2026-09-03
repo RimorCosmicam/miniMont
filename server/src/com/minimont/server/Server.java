@@ -389,6 +389,10 @@ public final class Server {
             }
             // The dock's own heartbeat. Nothing is sent unless the answer changed.
             session.execute(() -> announce(false));
+            // And a look for anything the system's own caption has just filled the screen with.
+            session.execute(() -> {
+                if (display != null) Desktop.keepOffTheBar(display.id(), width, height);
+            });
             // Every fifth tick, in frames per second rather than a running total: "no picture" has
             // several causes that look identical from here, and the rate tells them apart — nothing
             // encoded is a dead display, encoded but dropped is a socket that will not take them.
