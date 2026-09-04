@@ -23,6 +23,8 @@ The one idea, entirely: everything decoration used to say, the type says instead
 - No shadows, no gradients, no blur. 92% black is the entire separation.
 - White carries hierarchy through opacity alone, on the existing ladder.
 - The type scale, and the weights, and Black as the default rather than an emphasis.
+  The typeface itself is Poppins (Open Font License, shipped in `res/font`); `Mont`
+  remains the name of the language and of the family token in code.
 - One accent at a time, carrying a state and never decorating one.
 - The stripes, at 26.565°, only on full-screen moments and never behind content —
   with one amendment below.

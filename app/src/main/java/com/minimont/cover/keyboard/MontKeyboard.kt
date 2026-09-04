@@ -207,7 +207,7 @@ fun MontKeyboard(
     }
 
     val typeface = remember {
-        runCatching { ResourcesCompat.getFont(context, R.font.mont_black) }.getOrNull()
+        runCatching { ResourcesCompat.getFont(context, R.font.poppins_black) }.getOrNull()
             ?: android.graphics.Typeface.DEFAULT_BOLD
     }
 

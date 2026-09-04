@@ -9,7 +9,7 @@ import androidx.compose.ui.unit.sp
 import com.minimont.R
 
 /**
- * Mont, in five weights.
+ * Poppins, in five weights — the language's typeface, under the language's name.
  *
  * Compose snaps an unlisted weight to the nearest supplied one, so SemiBold has to ship even
  * though it is rarely named: without it Medium collapses onto Regular and headings stop reading
@@ -19,11 +19,11 @@ import com.minimont.R
  * from it, which is what lets a plain word act as a button without any box around it.
  */
 val Mont = FontFamily(
-    Font(R.font.mont_thin, FontWeight.Thin),
-    Font(R.font.mont_light, FontWeight.Light),
-    Font(R.font.mont_regular, FontWeight.Normal),
-    Font(R.font.mont_semibold, FontWeight.SemiBold),
-    Font(R.font.mont_black, FontWeight.Black)
+    Font(R.font.poppins_thin, FontWeight.Thin),
+    Font(R.font.poppins_light, FontWeight.Light),
+    Font(R.font.poppins_regular, FontWeight.Normal),
+    Font(R.font.poppins_semibold, FontWeight.SemiBold),
+    Font(R.font.poppins_black, FontWeight.Black)
 )
 
 /**
